@@ -172,3 +172,16 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+# DuckDB database files
+*.duckdb
+*.duckdb.wal
+
+# dbt artifacts
+dbt_packages/
+target/
+dbt_modules/
+
+# dbt logs
+logs/
