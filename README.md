@@ -6,37 +6,37 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 
 ### Focus Areas Section
 
-• Managers and business leaders
-• Professions with social focus
-• Professions with technical focus
+- Managers and business leaders
+- Professions with social focus
+- Professions with technical focus
 
 ### Technical Structure
 
-• Data Collection: dlt to retrieve data from Jobtech API to DuckDB
-• Data Transformation: dbt to structure data according to dimensional model
-• Data Visualization: Streamlit dashboard for vacancy analysis
+- Data Collection: dlt to retrieve data from Jobtech API to DuckDB
+- Data Transformation: dbt to structure data according to dimensional model
+- Data Visualization: Streamlit dashboard for vacancy analysis
 
 ### Installation
 
-• Clone the repository from Github and add team members
-• Install dependencies
-• Configure dlt and dbt
+- Clone the repository from Github and add team members
+- Install dependencies
+- Configure dlt and dbt
 
 ### Run the Pipeline
 
-• Extract data: python extraction/jobtech_api.py
-• Transform data: dbt run
-• Launch dashboard: streamlit run dashboard/app.py
+- Extract data: python extraction/jobtech_api.py
+- Transform data: dbt run
+- Launch dashboard: streamlit run dashboard/app.py
 
 ### Collaboration Guidelines
 
-• Work in feature branches with descriptive names
-• Pull from main before creating pull requests
-• Make small, focused commits
-• Use the Kanban board to track progress
+- Work in feature branches with descriptive names
+- Pull from main before creating pull requests
+- Make small, focused commits
+- Use the Kanban board to track progress
 
 ### Team Members
 
-• Susanne
-• Markus
-• Roberto
+- Susanne
+- Markus
+- Roberto
