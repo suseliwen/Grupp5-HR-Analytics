@@ -1,4 +1,4 @@
-WITH job_ads AS (SELECT * FROM {{ ref('src_job_ads') }})
+WITH job_ads AS (SELECT * FROM {{ source('job_ads', 'stg_ads') }})
 
 select
     {{ dbt_utils.generate_surrogate_key(['occupation__label']) }} AS occupation_id,
