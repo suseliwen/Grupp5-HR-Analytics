@@ -4,16 +4,12 @@ SELECT
     {{ dbt_utils.generate_surrogate_key(['id']) }} AS job_details_id,
     headline,
     description,
-    description_html,
+    description_html_formatted,
+    employment_type,
     COALESCE(duration, 'Ingen data') AS duration,
     salary_type,
-    salary_description,
-    COALESCE(working_hours_type__label, 'Igen data') AS working_hours_type__label,
-    
     CASE WHEN scope_of_work_min IS NULL THEN 'Ingen data' 
      ELSE CAST(scope_of_work_min AS STRING) END AS scope_of_work_min,
-    
     CASE WHEN scope_of_work_max IS NULL THEN 'Ingen data' 
-     ELSE CAST(scope_of_work_max AS STRING) END AS scope_of_work_max,
-
+     ELSE CAST(scope_of_work_max AS STRING) END AS scope_of_work_max
 FROM job_details
