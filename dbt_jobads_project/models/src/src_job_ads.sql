@@ -1,5 +1,5 @@
 
--- Code from lesson 7/data-engineering-OPA240-2023/lesson_7/dbt_jobads_project/models/src/src_job_ads.sql
+-- Code from lesson
 with stg_job_ads as (select * from {{ source('job_ads', 'stg_ads') }})
 
 select
