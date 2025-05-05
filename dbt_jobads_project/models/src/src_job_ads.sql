@@ -1,10 +1,13 @@
+
+-- Code from lesson 7/data-engineering-OPA240-2023/lesson_7/dbt_jobads_project/models/src/src_job_ads.sql
 with stg_job_ads as (select * from {{ source('job_ads', 'stg_ads') }})
 
 select
-    occupation__concept_id as occupation_id,
-    occupation_group__concept_id as occupation_group_id,
-    occupation_field__concept_id as occupation_field_id,
-    occupation__label as occupation,
-    occupation_group__label as occupation_group,
-    occupation_field__label as occupation_field,
+    occupation__label,
+    id,
+    employer__workplace,
+    workplace_address__municipality,
+    number_of_vacancies as vacancies,
+    relevance,
+    application_deadline
 from stg_job_ads
