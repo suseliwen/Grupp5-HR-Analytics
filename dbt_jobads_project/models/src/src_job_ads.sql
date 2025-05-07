@@ -9,5 +9,8 @@ select
     workplace_address__municipality,
     number_of_vacancies as vacancies,
     relevance,
-    application_deadline
+    application_deadline,
+    driving_license_required,
+    access_to_own_car as own_car_required,
+    experience_required
 from stg_job_ads
