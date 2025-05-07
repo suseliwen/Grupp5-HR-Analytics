@@ -7,10 +7,10 @@ dim_aux AS (
 )
 
 SELECT
-    {{ dbt_utils.generate_surrogate_key(['occupation__label']) }} AS occupation_id,
-    {{ dbt_utils.generate_surrogate_key(['id']) }} AS job_details_id,
-    {{ dbt_utils.generate_surrogate_key(['employer__workplace', 'workplace_address__municipality']) }} AS employer_id,
-    dim_aux.auxiliary_attributes_id
+    {{ dbt_utils.generate_surrogate_key(['job_ads.occupation__label']) }} AS occupation_id,
+    {{ dbt_utils.generate_surrogate_key(['job_ads.id']) }} AS job_details_id,
+    {{ dbt_utils.generate_surrogate_key(['job_ads.employer__workplace', 'job_ads.workplace_address__municipality']) }} AS employer_id,
+    dim_aux.auxiliary_attributes_id,
     job_ads.vacancies,
     job_ads.relevance,
     job_ads.application_deadline
