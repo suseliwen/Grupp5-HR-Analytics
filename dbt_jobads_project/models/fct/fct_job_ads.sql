@@ -11,9 +11,9 @@ SELECT
     {{ dbt_utils.generate_surrogate_key(['job_ads.id']) }} AS job_details_id,
     {{ dbt_utils.generate_surrogate_key(['job_ads.employer__workplace', 'job_ads.workplace_address__municipality']) }} AS employer_id,
     dim_aux.auxiliary_attributes_id,
-    job_ads.vacancies,
-    job_ads.relevance,
-    job_ads.application_deadline
+    vacancies,
+    relevance,
+    application_deadline
 FROM job_ads
 LEFT JOIN dim_aux
     ON job_ads.driving_license_required = dim_aux.driving_license_required
