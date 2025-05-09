@@ -11,6 +11,7 @@ select
     driving_license_required,
     access_to_own_car as own_car_required,
     experience_required,
+    employer__name,
     employer__workplace,
     workplace_address__municipality 
 from stg_job_ads
