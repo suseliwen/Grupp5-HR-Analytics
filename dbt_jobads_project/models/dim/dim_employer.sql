@@ -1,5 +1,5 @@
 WITH dim_employer AS (SELECT * FROM {{ ref('src_employer') }})
-SELECT {{dbt_utils.generate_surrogate_key(['id']) }} AS employer_id, 
+SELECT {{ dbt_utils.generate_surrogate_key(['employer_name', 'employer_workplace']) }} AS employer_id, 
     employer_name, 
     employer_workplace, 
     employer_organization_number,
