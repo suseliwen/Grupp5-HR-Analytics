@@ -17,6 +17,8 @@ SELECT
     jd.description,
     jd.duration,
     jd.salary_type,
+    jd.description_html_formatted,
+    jd.employment_type,
     e.employer_workplace,
     e.workplace_region,
     a.driving_license_required,
