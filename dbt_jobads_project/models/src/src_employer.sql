@@ -7,5 +7,6 @@ SELECT id,
     workplace_address__region as workplace_region,
     workplace_address__postcode as workplace_postcode,
     workplace_address__city as workplace_city,
-    workplace_address__country as workplace_country
+    workplace_address__country as workplace_country,
+    workplace_address__municipality as workplace_municipality
 FROM stg_job_ads
