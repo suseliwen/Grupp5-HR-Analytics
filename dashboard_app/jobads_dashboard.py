@@ -20,7 +20,7 @@ occupation_to_mart = {
 
 # User input for occupation field
 st.sidebar.header("Välj yrkesområde")
-occupation_field_choice = st.sidebar.selectbox("Yrkesområde", list(occupation_to_mart.keys()))
+occupation_field_choice = st.sidebar.selectbox("Välj ett yrkesområde...", list(occupation_to_mart.keys()))
 
 # Get the corresponding mart name from dictionary
 mart_table = occupation_to_mart[occupation_field_choice] 
