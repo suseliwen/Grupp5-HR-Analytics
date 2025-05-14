@@ -6,7 +6,7 @@ with dim_occupation as (
 -- and generating a surrogate key for the occupation
     select
     {{ dbt_utils.generate_surrogate_key(['occupation']) }} as occupation_id,
-    occupation,
+    max (occupation) as occupation, 
     max(occupation_group) as occupation_group, -- get a representative group for each occupation
     max(occupation_field) as occupation_field -- get a representative field for each occupation
 from dim_occupation
