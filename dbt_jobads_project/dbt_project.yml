@@ -31,5 +31,5 @@ models:
     fct:
       +schema: refined
 
-    marts:
-      +schema: marts
+    mart:
+      +schema: mart

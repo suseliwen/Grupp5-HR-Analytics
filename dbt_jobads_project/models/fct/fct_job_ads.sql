@@ -9,7 +9,7 @@ dim_aux AS (
 SELECT
     {{ dbt_utils.generate_surrogate_key(['job_ads.occupation__label']) }} AS occupation_id,
     {{ dbt_utils.generate_surrogate_key(['job_ads.id']) }} AS job_details_id,
-    {{ dbt_utils.generate_surrogate_key(['job_ads.employer__workplace', 'job_ads.employer__name', 'workplace_municipality']) }} AS employer_id,
+    {{ dbt_utils.generate_surrogate_key(['job_ads.employer__workplace', 'job_ads.employer__name', 'workplace_address__municipality']) }} AS employer_id,
     dim_aux.auxiliary_attributes_id,
     vacancies,
     relevance,
