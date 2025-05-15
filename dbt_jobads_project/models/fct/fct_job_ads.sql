@@ -3,6 +3,7 @@ WITH job_ads AS (
 )
 
 SELECT
+
     {{ dbt_utils.generate_surrogate_key(['occupation__label']) }} AS occupation_id,
     {{ dbt_utils.generate_surrogate_key(['id']) }} AS job_details_id,
     {{ dbt_utils.generate_surrogate_key(['employer__workplace', 'workplace_address__municipality']) }} AS employer_id,

@@ -7,7 +7,6 @@ WITH
 
 SELECT
     jd.headline,
-    e.employer_name,    
     f.vacancies,
     f.relevance,
     o.occupation,
@@ -17,13 +16,15 @@ SELECT
     jd.description,
     jd.duration,
     jd.salary_type,
-    jd.description_html_formatted,
-    jd.employment_type,
+    e.employer_name,
     e.employer_workplace,
     e.workplace_region,
+    jd.employment_type,
+    jd.scope_of_work_min,
+    jd.scope_of_work_max,
     a.driving_license_required,
     a.own_car_required,
-    a.experience_required  
+    a.experience_required
 FROM fct_job_ads f
 LEFT JOIN dim_job_details jd ON f.job_details_id = jd.job_details_id
 LEFT JOIN dim_occupation o ON f.occupation_id = o.occupation_id
