@@ -17,6 +17,7 @@ st.title("HR Analytics Dashboard")
 
 # Conncetion between occupation field and marts
 occupation_to_mart = {
+
     "Alla": "mart.mart_all_jobs",
     "Yrken med social inriktning": "mart.mart_occupation_social",
     "Yrken med teknisk inriktning": "mart.mart_it_jobs",
