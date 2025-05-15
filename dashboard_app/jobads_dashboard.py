@@ -13,9 +13,10 @@ st.title("HR Analytics Dashboard")
 
 # Conncetion between occupation field and marts
 occupation_to_mart = {
-    "Yrken med social inriktning": "marts.marts_occupation_social",
-    "Yrken med teknisk inriktning": "marts.marts_it_jobs",
-    "Chefer och verksamhetsledare" : "marts.marts_leadership_jobs"
+    "Samtliga yrkesområden": "mart.mart_all_jobs",
+    "Yrken med social inriktning": "mart.mart_occupation_social",
+    "Yrken med teknisk inriktning": "mart.mart_it_jobs",
+    "Chefer och verksamhetsledare" : "mart.mart_leadership_jobs"
 }
 
 # User input for occupation field
