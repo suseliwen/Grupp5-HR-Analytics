@@ -13,6 +13,7 @@ from utils import DataBase_Connection
 st.set_page_config(page_title="HR Analytics Dashboard", layout="wide")
 st.title("HR Analytics Dashboard")
 
+
 # Conncetion between occupation field and marts
 occupation_to_mart = {
 
@@ -25,8 +26,8 @@ occupation_to_mart = {
 # ======== USER INPUT ========
 
 # User input for occupation field
-st.sidebar.header("Yrkesområden")
-select_occupation_field = st.sidebar.selectbox("Välj ett yrkesområde...", list(occupation_to_mart.keys()))
+
+select_occupation_field = st.sidebar.selectbox("Välj yrkesområde...", list(occupation_to_mart.keys()))
 
 # Get the corresponding mart name from dictionary
 mart_table = occupation_to_mart[select_occupation_field] 
@@ -82,7 +83,7 @@ if select_employment_type != "Alla":
 
 st.subheader(f"Visar jobbannonser för {select_occupation_field}")
 
-col1, col2, col3 = st.columns(3)
+col1, col2= st.columns(2)
 
 # === Column 1 - Topp 5 occupation ===
 with col1:
@@ -126,5 +127,7 @@ with col2:
     fig2.update_layout(xaxis_tickangle=-30)
     st.plotly_chart(fig2, use_container_width=True)
 
+
+   
 
 st.dataframe(filtered_df)
