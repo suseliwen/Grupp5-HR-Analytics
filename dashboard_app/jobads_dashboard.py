@@ -5,6 +5,7 @@ from pathlib import Path
 import altair as alt
 import plotly.express as px
 from utils import DataBase_Connection
+from map.hr_map import create_hr_map
 
 
 # ======= PAGE SETUP ========
@@ -53,7 +54,7 @@ select_occupation = st.sidebar.selectbox("Välj yrkestitel:", ["Alla"] + sorted(
 
 # Add a selectbox for region selection
 region = df['workplace_region'].dropna().unique()
-select_region = st.sidebar.selectbox("Välj kommun:", ["Alla"] + sorted(region.tolist()))
+select_region = st.sidebar.selectbox("Välj län:", ["Alla"] + sorted(region.tolist()))
 
 # Add a selectbox for employment type selection
 employment_type = df['employment_type'].dropna().unique()
@@ -83,7 +84,7 @@ if select_employment_type != "Alla":
 
 st.subheader(f"Visar jobbannonser för {select_occupation_field}")
 
-col1, col2= st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 # === Column 1 - Topp 5 occupation ===
 with col1:
@@ -127,7 +128,10 @@ with col2:
     fig2.update_layout(xaxis_tickangle=-30)
     st.plotly_chart(fig2, use_container_width=True)
 
+# === Column 3 - Contains the map ===
+with col3:
 
+    create_hr_map(filtered_df, select_occupation_field)
    
 
 st.dataframe(filtered_df)
