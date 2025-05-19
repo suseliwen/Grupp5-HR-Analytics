@@ -10,6 +10,19 @@ import requests
 import json
 from pathlib import Path
 import os
+import duckdb
+
+# Function to fetch distinct IDs from the DuckDB database.
+# This is used to avoid duplicate entries when loading data.
+def get_existing_ids():
+    try:
+        con = duckdb.connect("jobads_data_warehouse.duckdb")
+        result = con.execute("SELECT DISTINCT id FROM job_ads").fetchall()
+        con.close()
+        return {row[0] for row in result}
+    except Exception as e:
+        print(f"Error fetching existing IDs: {e}")
+        return set()
 
 # Sends a GET-request to the URL, with specified parameters and headers.
 # Raises an exception if the request fails.
@@ -23,7 +36,7 @@ def _get_ads(url_for_search, params):
 # Loads data (job ads) from the specified URL into a DLT-pipeline.
 # The function is a DLT resource, which means it can be used to load data into a DLT pipeline.
 @dlt.resource(write_disposition="append")
-def jobsearch_resource(params):
+def jobsearch_resource(params, existing_ids):
     # Set up API URL and pagination parameters: 'limit' defines page size, 'offset' defines starting point.
     url = "https://jobsearch.api.jobtechdev.se"
     url_for_search = f"{url}/search"
@@ -39,9 +52,11 @@ def jobsearch_resource(params):
         if not hits:            
             break
 
-        # Yield each ad from the current page.
+        # Yield each ad from the current page and check if ad already exists in the database.
         for ad in hits:
-            yield ad
+            ad_id = ad.get("id")
+            if ad_id and ad_id not in existing_ids:
+                yield ad
 
         # If fewer ads than the limit are returned, or if the offset exceeds 1900, stop fetching.
         if len(hits) < limit or offset > 1900:
@@ -57,11 +72,16 @@ def run_pipeline(query, table_name, occupation_fields):
         destination=dlt.destinations.duckdb("jobads_data_warehouse.duckdb"),
         dataset_name="staging",
     )
+
+    # Get existing IDs from the database to avoid duplicates.
+    existing_ids = get_existing_ids()
+    
     # Iterate over each occupation field and load job ads into the pipeline.
     for occupation_field in occupation_fields:
         params = {"q": query, "limit": 100, "occupation-field": occupation_field}
         load_info = pipeline.run(
-            jobsearch_resource(params=params), table_name=table_name
+            jobsearch_resource(params=params, existing_ids=existing_ids),
+            table_name=table_name
         )
         print(f"Occupation field: {occupation_field}")
         print(load_info)

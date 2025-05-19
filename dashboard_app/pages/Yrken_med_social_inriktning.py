@@ -13,11 +13,8 @@ now = datetime.now(ZoneInfo("Europe/Stockholm"))
 st.set_page_config(page_title="HR Analytics Dashboard", layout="wide")
 st.title("Yrkesområden med social inriktning")
 
-st.markdown("Visar tillgängliga arbeten inom yrkesområden med social inriktning. ")
-st.sidebar.success("Viktig info")
+#st.success("Annonserna hämtas från Arbetsförmedlingen och uppdateras varje natt.")
 
-progress_bar = st.sidebar.progress(0)
-status_text = st.sidebar.empty()
 
 # ======== DATA LOADING ========
 
@@ -43,7 +40,46 @@ with DataBase_Connection() as conn:
     df_trending_ads = conn.execute("SELECT * FROM mart.mart_all_jobs").fetchdf()  
     df_trending_ads = df_trending_ads[df_trending_ads["occupation_field"] == "Yrken med social inriktning"]
     df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce")
-     
+
+
+# ======== SIDEBAR ========
+# Create a sidebar for user input
+st.sidebar.header("Filtrera ditt urval")
+# Add a selectbox for job occupation group selection
+occupation = df['occupation'].dropna().unique()
+select_occupation = st.sidebar.selectbox("Välj yrkestitel:", ["Alla"] + sorted(occupation.tolist()))
+# Add a selectbox for region selection
+region = df['workplace_region'].dropna().unique()
+select_region = st.sidebar.selectbox("Välj län:", ["Alla"] + sorted(region.tolist()))
+# Add a selectbox for employment type selection
+employment_type = df['employment_type'].dropna().unique()
+select_employment_type = st.sidebar.selectbox("Välj anställningstyp:", ["Alla"] + sorted(employment_type.tolist()))
+# Add a selectbox for employer name selection
+duration = df['duration'].dropna().unique()
+select_duration = st.sidebar.selectbox("Välj anställningens längd:", ["Alla"] + sorted(duration.tolist()))
+
+st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
+st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
+st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
+
+# ======== DATAFRAME FILTERING ==========
+# Filter the DataFrame based on user input
+filtered_df = df.copy()
+if select_occupation != "Alla":
+    filtered_df = filtered_df[filtered_df["occupation"] == select_occupation]
+if select_region != "Alla":
+    filtered_df = filtered_df[filtered_df["workplace_region"] == select_region]
+if select_employment_type != "Alla":
+    filtered_df = filtered_df[filtered_df["employment_type"] == select_employment_type]
+if select_duration != "Alla":
+    filtered_df = filtered_df[filtered_df["duration"] == select_duration]
+if st.session_state.get("driving_license_required"):
+    filtered_df = filtered_df[filtered_df["driving_license_required"] == True]
+if st.session_state.get("own_car_required"):
+    filtered_df = filtered_df[filtered_df["own_car_required"] == True]
+if st.session_state.get("experience_required"):
+    filtered_df = filtered_df[filtered_df["experience_required"] == True]
+
 
 # ======== SHOW DATA ========
 # Remove rows with 'Ingen data' in 'workplace_region' column
@@ -91,45 +127,24 @@ with column5:
     fig.update_layout(showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
    
-
-    
-column6, column7 = st.columns(2)
-with column6:
-    st.markdown("<h4 style='font-size:18px; margin-bottom:10px;'>Topp 5 mest efterfrågade yrkestitlar</h4>", unsafe_allow_html=True)
-    job_title_counts = (
-        df['occupation']
-        .value_counts()
-        .head(5)
-        .reset_index()
-    )
-    job_title_counts.columns = ['occupation', 'count'] 
-    fig1 = px.bar(
-        job_title_counts,
-        x='occupation',
-        y='count',
-        title='Antal annonser per yrkestitel',
-        text='count'
-    )
-    fig1.update_traces(textposition='inside')
-    fig1.update_layout(xaxis_tickangle=-30)
-    st.plotly_chart(fig1, use_container_width=True)
+  
 
 
-# ======== Pagination Logic ======== INTE EGEN KOD!!!
-st.markdown("### Annonser")
+# ======== PAGINATION ======== 
+st.markdown("#### Annonser utifrån dina val")
 
-rows_per_page = 100  # Visa 50 rader per sida
+rows_per_page = 100 
 total_rows = len(df)
-total_pages = (total_rows - 1) // rows_per_page + 1
+total_pages = (total_rows - 1) // rows_per_page + 1 
 
-# Välj sida i en selectbox eller number_input
+
 page = st.number_input("Sida", min_value=1, max_value=total_pages, value=1, step=1)
 
 start_idx = (page - 1) * rows_per_page
 end_idx = min(start_idx + rows_per_page, total_rows)
+current_page_df = filtered_df.iloc[start_idx:end_idx]
+st.markdown(f"Visar {len(current_page_df)} rader (av {len(filtered_df)} matchande annonser)")
 
-st.markdown(f"Visar rader **{start_idx + 1}–{end_idx}** av totalt **{total_rows}**.")
 
 
-# Visa bara den aktuella sidan
-st.dataframe(df.iloc[start_idx:end_idx], use_container_width=True)
+st.dataframe(current_page_df, use_container_width=True)
