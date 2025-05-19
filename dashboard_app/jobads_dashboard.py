@@ -60,8 +60,9 @@ select_region = st.sidebar.selectbox("Välj län:", ["Alla"] + sorted(region.tol
 employment_type = df['employment_type'].dropna().unique()
 select_employment_type = st.sidebar.selectbox("Välj anställningsform:", ["Alla"] + sorted(employment_type.tolist()))
 
-st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required,")
+st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
 st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
+st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
 
 
 #========== DATAFRAME FILTERING ==========
@@ -78,6 +79,17 @@ if select_occupation != "Alla":
 
 if select_employment_type != "Alla":
     filtered_df = filtered_df[filtered_df['employment_type'] == select_employment_type]
+
+if st.session_state.get("driving_license_required"):
+    filtered_df = filtered_df[filtered_df['driving_license_required'] == True]
+
+if st.session_state.get("own_car_required"):
+    filtered_df = filtered_df[filtered_df['own_car_required'] == True]
+
+if st.session_state.get("experience_required"):
+    filtered_df = filtered_df[filtered_df['experience_required'] == True]
+
+
 
 
 # ========= SHOWING DATA ==========
