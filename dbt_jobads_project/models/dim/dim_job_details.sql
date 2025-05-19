@@ -3,6 +3,7 @@ WITH job_details AS (SELECT * FROM {{ ref('src_job_details') }})
 SELECT
     {{ dbt_utils.generate_surrogate_key(['id']) }} AS job_details_id,
     COALESCE (headline, 'Ingen data') AS headline,
+    CAST(publication_date AS DATE) AS publication_date,
     COALESCE (description, 'Ingen data') AS description,
     COALESCE (description_html_formatted, 'Ingen data') AS description_html_formatted,
     COALESCE (employment_type, 'Ingen data') AS employment_type,

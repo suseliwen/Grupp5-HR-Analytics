@@ -6,13 +6,11 @@ WITH
     dim_aux AS (SELECT * FROM {{ ref('dim_aux') }}),
 
     joined AS (
-        SELECT
-            f.job_details_id AS job_id,
+        SELECT           
+            CAST(jd.publication_date AS DATE) AS publication_date,
             jd.headline,
-            f.vacancies,
-            f.relevance,
             o.occupation,
-            o.occupation_group,
+            o.occupation_group, 
             o.occupation_field,
             f.application_deadline,
             jd.description,
@@ -21,12 +19,16 @@ WITH
             e.employer_name,
             e.employer_workplace,
             e.workplace_region,
+            f.vacancies,
             jd.employment_type,
             jd.scope_of_work_min,
             jd.scope_of_work_max,
             a.driving_license_required,
             a.own_car_required,
-            a.experience_required
+            a.experience_required,
+            f.job_details_id AS job_id,
+            f.relevance,
+
         FROM fct_job_ads f
         LEFT JOIN dim_job_details jd ON f.job_details_id = jd.job_details_id
         LEFT JOIN dim_occupation o ON f.occupation_id = o.occupation_id
