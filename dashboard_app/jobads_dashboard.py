@@ -101,7 +101,8 @@ with col1:
         x='occupation',
         y='count',
         title='Antal annonser per yrkestitel',
-        text='count'
+        text='count',
+        labels={'occupation': 'Yrkestitel', 'count': 'Antal'}
     )
     fig1.update_traces(textposition='inside')
     fig1.update_layout(xaxis_tickangle=-30)
@@ -109,7 +110,8 @@ with col1:
 
 # === Column 2 - Top 5 regions ===
 with col2:
-    st.markdown("<h4 style='font-size:18px; margin-bottom:10px;'>Topp 5 kommuner med lediga jobb</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='font-size:18px; margin-bottom:10px;'>Topp 5 län med lediga jobb</h4>", unsafe_allow_html=True)
+    region_filtered_df = filtered_df[filtered_df['workplace_region'] != 'Ingen data']
     region_counts = (
         filtered_df['workplace_region']
         .value_counts()
@@ -121,8 +123,9 @@ with col2:
         region_counts,
         x='workplace_region',
         y='count',
-        title='Antal annonser per kommun',
-        text='count'
+        title='Antal annonser per län',
+        text='count',
+        labels={'workplace_region': 'Län', 'count': 'Antal'}
     )
     fig2.update_traces(textposition='inside')
     fig2.update_layout(xaxis_tickangle=-30)
