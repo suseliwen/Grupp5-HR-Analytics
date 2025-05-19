@@ -46,12 +46,16 @@ with DataBase_Connection() as conn:
      
 
 # ======== SHOW DATA ========
+# Remove rows with 'Ingen data' in 'workplace_region' column
+unique_regions = df[df['workplace_region'] != 'Ingen data']['workplace_region'].nunique()
+
 column1, column2, column3, column4 = st.columns(4)
 
 column1.metric("Antal jobbannonser", df.shape[0])
 column2.metric("Antal unika yrkestitlar", df['occupation'].nunique())
 column3.metric("Antal unika arbetsgivare", df['employer_name'].nunique())
-column4.metric("Antal unika regioner", df['workplace_region'].nunique())
+column4.metric("Antal län", unique_regions)
+
 
 column4, column5 = st.columns(2)
 
