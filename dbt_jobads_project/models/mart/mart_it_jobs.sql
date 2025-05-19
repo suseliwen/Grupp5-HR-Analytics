@@ -7,6 +7,7 @@ WITH
 
     joined AS (
         SELECT
+            CAST(jd.publication_date AS DATE) AS publication_date,
             f.job_details_id AS job_id,
             jd.headline,
             f.vacancies,

@@ -7,7 +7,7 @@ WITH
 
     joined AS (
         SELECT
-            f.job_details_id AS job_id,
+            CAST(jd.publication_date AS DATE) AS publication_date,
             jd.headline,
             f.vacancies,
             f.relevance,
@@ -26,7 +26,8 @@ WITH
             jd.scope_of_work_max,
             a.driving_license_required,
             a.own_car_required,
-            a.experience_required
+            a.experience_required,
+            f.job_details_id AS job_id
         FROM fct_job_ads f
         LEFT JOIN dim_job_details jd ON f.job_details_id = jd.job_details_id
         LEFT JOIN dim_occupation o ON f.occupation_id = o.occupation_id

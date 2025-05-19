@@ -3,6 +3,7 @@ WITH stg_job_ads AS (SELECT * FROM {{ source('job_ads', 'stg_ads') }})
 SELECT
     id,
     headline,
+    publication_date,
     description__text AS description,
     description__text_formatted AS description_html_formatted,
     employment_type__label AS employment_type,

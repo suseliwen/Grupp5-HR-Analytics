@@ -12,7 +12,8 @@ WITH stg_job_ads AS (
 
 SELECT
     id,
-    occupation__label,    
+    occupation__label,
+    publication_date,  
     number_of_vacancies AS vacancies,
     relevance,
     application_deadline,
