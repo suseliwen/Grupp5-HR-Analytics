@@ -60,8 +60,9 @@ select_region = st.sidebar.selectbox("Välj län:", ["Alla"] + sorted(region.tol
 employment_type = df['employment_type'].dropna().unique()
 select_employment_type = st.sidebar.selectbox("Välj anställningsform:", ["Alla"] + sorted(employment_type.tolist()))
 
-st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required,")
+st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
 st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
+st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
 
 
 #========== DATAFRAME FILTERING ==========
@@ -78,6 +79,17 @@ if select_occupation != "Alla":
 
 if select_employment_type != "Alla":
     filtered_df = filtered_df[filtered_df['employment_type'] == select_employment_type]
+
+if st.session_state.get("driving_license_required"):
+    filtered_df = filtered_df[filtered_df['driving_license_required'] == True]
+
+if st.session_state.get("own_car_required"):
+    filtered_df = filtered_df[filtered_df['own_car_required'] == True]
+
+if st.session_state.get("experience_required"):
+    filtered_df = filtered_df[filtered_df['experience_required'] == True]
+
+
 
 
 # ========= SHOWING DATA ==========
@@ -101,7 +113,8 @@ with col1:
         x='occupation',
         y='count',
         title='Antal annonser per yrkestitel',
-        text='count'
+        text='count',
+        labels={'occupation': 'Yrkestitel', 'count': 'Antal'}
     )
     fig1.update_traces(textposition='inside')
     fig1.update_layout(xaxis_tickangle=-30)
@@ -109,7 +122,8 @@ with col1:
 
 # === Column 2 - Top 5 regions ===
 with col2:
-    st.markdown("<h4 style='font-size:18px; margin-bottom:10px;'>Topp 5 kommuner med lediga jobb</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='font-size:18px; margin-bottom:10px;'>Topp 5 län med lediga jobb</h4>", unsafe_allow_html=True)
+    region_filtered_df = filtered_df[filtered_df['workplace_region'] != 'Ingen data']
     region_counts = (
         filtered_df['workplace_region']
         .value_counts()
@@ -121,8 +135,9 @@ with col2:
         region_counts,
         x='workplace_region',
         y='count',
-        title='Antal annonser per kommun',
-        text='count'
+        title='Antal annonser per län',
+        text='count',
+        labels={'workplace_region': 'Län', 'count': 'Antal'}
     )
     fig2.update_traces(textposition='inside')
     fig2.update_layout(xaxis_tickangle=-30)

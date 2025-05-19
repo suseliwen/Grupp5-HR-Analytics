@@ -14,7 +14,7 @@ WITH
             o.occupation,
             o.occupation_group,
             o.occupation_field,
-            f.application_deadline,
+            CAST(f.application_deadline AS DATE) AS application_deadline,
             jd.description,
             jd.duration,
             jd.salary_type,
