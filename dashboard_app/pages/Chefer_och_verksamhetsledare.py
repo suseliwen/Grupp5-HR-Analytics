@@ -7,6 +7,15 @@ from datetime import datetime
 # ======== PAGE CONFIGURATION ========
 st.set_page_config(page_title="Chefer och verksamhetsledare", layout="wide")
 
+def load_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+try:
+    load_css('./styles/style.css')
+except Exception as e:
+    print(f"Kunde inte ladda in style.css: {e}")
+
+
 # ======== DATA LOADING FUNCTIONS ========
 def load_leadership_data():
     """Loads data for managers and business leaders from the database"""
@@ -67,6 +76,7 @@ def load_leadership_data():
                                     'workplace_region', 'publication_date', 'application_deadline', 
                                     'is_open'])
 
+
 # ======== METRICS VISUALIZATION FUNCTIONS ========
 def show_leadership_metrics(df, filtered_df=None):
     """Displays key metrics for leadership roles"""
@@ -112,6 +122,7 @@ def show_leadership_metrics(df, filtered_df=None):
     if filtered_jobs < total_jobs:
         st.info(f"**Filtrerad vy:** Visar {filtered_jobs} av totalt {total_jobs} annonser baserat på valda filter.")
 
+
 # ======== CHART VISUALIZATION FUNCTIONS ========
 def show_role_chart(df):
     """Displays chart for the most common leadership roles"""
@@ -120,6 +131,11 @@ def show_role_chart(df):
         return
     
     st.subheader("Topp 10 chefsroller")
+    
+    # Container with border and class for CSS styling
+    with st.container():
+        st.markdown('<div class="role-chart-container">', unsafe_allow_html=True)
+    
     role_counts = df['occupation'].value_counts().head(10).reset_index()
     role_counts.columns = ['Chefsroll', 'Antal']
     
@@ -131,16 +147,19 @@ def show_role_chart(df):
         title="Mest efterfrågade chefsroller",
         labels={'Chefsroll': 'Chefsroll', 'Antal': 'Antal annonser'},
         color='Antal',
-        color_continuous_scale=px.colors.sequential.Blues
+        color_continuous_scale=px.colors.sequential.Reds
     )
     
     fig.update_traces(textposition='outside', texttemplate='%{x}')
     fig.update_layout(
-        yaxis=dict(autorange="reversed"),  # Place highest values at top
+        yaxis=dict(autorange="reversed"),
         margin=dict(l=20, r=20, t=30, b=20)
     )
     
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Close the container
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def show_region_chart(df):
@@ -150,34 +169,54 @@ def show_region_chart(df):
         return
         
     st.subheader("Topp 5 län")
-    region_df = df[df['workplace_region'] != 'Ingen data']
     
-    if region_df.empty:
-        st.warning("Ingen giltig länsdata tillgänglig för visualisering")
-        return
+    # Container with border and class for CSS styling
+    with st.container():
+        st.markdown('<div class="region-chart-container">', unsafe_allow_html=True)
+    
+    with st.container():
+        region_df = df[df['workplace_region'] != 'Ingen data']
         
-    region_counts = region_df['workplace_region'].value_counts().head(5).reset_index()
-    region_counts.columns = ['Län', 'Antal']
-    
-    fig = px.bar(
-        region_counts,
-        x='Län',
-        y='Antal',
-        title="Antal chefsannonser per län",
-        labels={'Län': 'Län', 'Antal': 'Antal annonser'},
-        color='Antal',
-        color_continuous_scale=px.colors.sequential.Oranges
-    )
-    
-    fig.update_traces(textposition='outside', texttemplate='%{y}')
-    fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
-    
-    st.plotly_chart(fig, use_container_width=True)
+        if region_df.empty:
+            st.warning("Ingen giltig länsdata tillgänglig för visualisering")
+            return
+            
+        region_counts = region_df['workplace_region'].value_counts().head(5).reset_index()
+        region_counts.columns = ['Län', 'Antal']
+        
+        fig = px.bar(
+            region_counts,
+            x='Län',
+            y='Antal',
+            title="Antal chefsannonser per län",
+            labels={'Län': 'Län', 'Antal': 'Antal annonser'},
+            color='Antal',
+            color_continuous_scale=px.colors.sequential.Reds
+        )
+        
+        fig.update_traces(textposition='outside', texttemplate='%{y}')
+        fig.update_layout(
+            yaxis=dict(autorange="reversed"),
+            margin=dict(l=20, r=20, t=50, b=20),
+            title_font=dict(size=18, family="Helvetica"),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=400,
+            title_x=0.5,
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        # Close the container
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def show_municipality_chart(df):
     """Displays chart for municipalities with the most leadership job listings"""
+    
     st.subheader("Topp 10 kommuner")
+    
+    # Add container with class for CSS styling
+    st.markdown('<div class="municipality-chart-container">', unsafe_allow_html=True)
     
     try:
         # First check if the DataFrame is empty
@@ -230,7 +269,7 @@ def show_municipality_chart(df):
             title="Topp 10 kommuner med flest chefsroller",
             labels={'Kommun': 'Kommun', 'Antal': 'Antal annonser'},
             color='Antal',
-            color_continuous_scale=px.colors.sequential.Greens
+            color_continuous_scale=px.colors.sequential.Reds
         )
         
         fig.update_traces(textposition='outside', texttemplate='%{x}')
@@ -240,6 +279,8 @@ def show_municipality_chart(df):
         )
         
         st.plotly_chart(fig, use_container_width=True)
+        # Close the container
+        st.markdown('</div>', unsafe_allow_html=True)
     
     except Exception as e:
         st.warning(f"Kunde inte visa kommundiagram: {str(e)}")
@@ -254,6 +295,8 @@ def show_trend_chart(df):
         return
         
     st.subheader("Trend för chefsrekryteringar")
+    # Add container with class for CSS styling
+    st.markdown('<div class="trend-chart-container">', unsafe_allow_html=True)
     
     try:
         # Check if we have enough data for a meaningful trend. 2 unique dates are needed.
@@ -282,9 +325,12 @@ def show_trend_chart(df):
         fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
         
         st.plotly_chart(fig, use_container_width=True)
+        # Close the container
+        st.markdown('</div>', unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"Fel vid visning av trenddiagram: {e}")
+
 
 # ======== DATA TABLE FUNCTIONS ========
 def show_jobs_table(df):
@@ -294,6 +340,9 @@ def show_jobs_table(df):
         return
         
     st.subheader("Chefsannonser")
+    
+    # Add container with class for CSS styling
+    st.markdown('<div class="table-container">', unsafe_allow_html=True)
     
     # Create copy of df for display
     display_df = df.copy()
@@ -366,6 +415,9 @@ def show_jobs_table(df):
         file_name="chefsroller_data.csv",
         mime="text/csv",
     )
+    # Close the container
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ======== FILTERING FUNCTIONS ========
 def add_sidebar_filters(df):
@@ -386,14 +438,22 @@ def add_sidebar_filters(df):
     
     # 2. Filter for leadership roles
     if 'occupation' in df.columns and df['occupation'].nunique() > 0:
-        occupations = df['occupation'].dropna().unique()
+        occupation_series = df['occupation'].dropna()
+        occupations = occupation_series[occupation_series != 'Ingen data'].unique()
+        occupations = sorted(occupations)
+        
         selected_occupations = st.sidebar.multiselect('Filtrera på chefsroll', occupations)
-        if selected_occupations:
+        if selected_occupations:  # <- Now properly indented
             filtered_df = filtered_df[filtered_df['occupation'].isin(selected_occupations)]
     
     # 3. Filter for counties
     if 'workplace_region' in df.columns and df['workplace_region'].nunique() > 0:
-        regions = df['workplace_region'].dropna().unique()
+        # Remove null and "Ingen data" values from region options
+        region_series = df['workplace_region'].dropna()
+        regions = region_series[region_series != 'Ingen data'].unique()
+        # Sort regions alphabetically
+        regions = sorted(regions)
+    
         selected_regions = st.sidebar.multiselect('Filtrera på län', regions)
         if selected_regions:
             filtered_df = filtered_df[filtered_df['workplace_region'].isin(selected_regions)]
@@ -407,7 +467,12 @@ def add_sidebar_filters(df):
     
     # 5. Filter for employers
     if 'employer_name' in df.columns and df['employer_name'].nunique() > 0:
-        employers = df['employer_name'].dropna().unique()
+        # Remove null and "Ingen data" values from employer options
+        employer_series = df['employer_name'].dropna()
+        employers = employer_series[employer_series != 'Ingen data'].unique()
+        # Sort employers alphabetically
+        employers = sorted(employers)
+        
         selected_employers = st.sidebar.multiselect('Filtrera på arbetsgivare', employers)
         if selected_employers:
             filtered_df = filtered_df[filtered_df['employer_name'].isin(selected_employers)]
@@ -417,6 +482,7 @@ def add_sidebar_filters(df):
         st.sidebar.markdown(f"**{len(filtered_df)}** jobb matchar filtren")
     
     return filtered_df
+
 
 # ======== MAIN APPLICATION ========
 def main():
@@ -444,6 +510,8 @@ def main():
         show_leadership_metrics(df, filtered_df)
         
         # ======== VISUALIZATION TABS ========
+        # Add tabs for visualizations
+        st.markdown('<div class="visualizations-section">', unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["Chefsroller och geografi", "Trendanalys"])
         
         with tab1:
@@ -460,6 +528,8 @@ def main():
         with tab2:
             # Display trend chart for the entire dataset (or filtered if we want)
             show_trend_chart(filtered_df)
+        # Close the visualizations section
+        st.markdown('</div>', unsafe_allow_html=True) 
         
         # ======== DATA TABLE SECTION ========
         show_jobs_table(filtered_df)
