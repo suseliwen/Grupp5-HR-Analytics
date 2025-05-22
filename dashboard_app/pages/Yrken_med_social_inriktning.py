@@ -5,6 +5,14 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo #Necessary for timezone conversion
+import logging
+
+# ======= LOGGING SETUP ========
+logging.basicConfig(
+    filename ='app.log',
+    level=logging.ERROR, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 # ======= PAGE SETUP ========
 
@@ -15,15 +23,29 @@ now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
 # ======== LOADING DATA FUNCTION ========
 
 def load_data():
-    with DataBase_Connection() as conn:
-        df = conn.execute("SELECT * FROM mart.mart_occupation_social").fetchdf()      
-                
-        df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
-        df["application_deadline"] = pd.to_datetime(df["application_deadline"], errors="coerce").dt.date
-        df = df[df["application_deadline"] >= now]       
-    return df
+    try:
+        with DataBase_Connection() as conn:       
+            df = conn.execute("SELECT * FROM mart.mart_occupation_social").fetchdf()      
+                    
+            df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
+            df["application_deadline"] = pd.to_datetime(df["application_deadline"], errors="coerce").dt.date
+            df = df[df["application_deadline"] >= now]
+        return df
+        
+    except Exception as e:
+        logging.error(f"Fel vid inläsning av data", exc_info=True)       
+        st.error(f"Fel vid inläsning av data: {e}")
+        return pd.DataFrame()    
+    
   
+# ======= ERROR HANDLING ========
 
+def check_if_dataframe_empty(df, messsage):
+    if df.empty:
+        logging.warning(messsage)
+        st.warning(messsage)
+        return True
+    return False
 
 # ======== DISPLAY SIDEBAR FUNCTION ========
 
@@ -143,28 +165,11 @@ def show_metric_data(df):
         st.metric("Antal län", unique_regions)
     
 
-# ===== ==== VISUALIZATION FUNCTIONS ========
-
-#
-#     cutoff_date = datetime.today() - timedelta(days=30)
-# #     df_trending_ads = df_trending_ads[df_trending_ads["publication_date"] >= cutoff_date]
-
-# #     trend_df = (
-# #         df_trending_ads.groupby(df_trending_ads["publication_date"].dt.date)
-# #         .size()
-# #         .reset_index(name="count")
-# #         .sort_values(by="publication_date")
-# #     )
-# #     fig = px.line(
-# #         trend_df,
-# #         x="publication_date",
-# #         y="count",
-# #         title="Antal annonser publicerade de senaste 30 dagarna",
-# #         labels={"publication_date": "Datum", "count": "Antal annonser"},
-# #     )
-# #     st.plotly_chart(fig, use_container_width=True)
-
+# ======== PLOTTING FUNCTIONS ========
 def employment_type_distribution(df):
+    if df.empty or df["employment_type"].dropna().empty:
+        st.info("Inga annonser matchar dina val.")
+        return
     st.markdown("#### Fördelning av annonser utifrån anställningstyp")
 
     employment_type_counts = df["employment_type"].value_counts()
@@ -187,6 +192,9 @@ def employment_type_distribution(df):
         
 
 def ads_per_week(df):
+    if df.empty or df["publication_date"].dropna().empty:
+        st.info("Inga annonser matchar dina val.")
+        return
     st.markdown("#### Antal annonser publicerade per vecka")
 
     df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
@@ -210,11 +218,6 @@ def ads_per_week(df):
     )                               
     st.plotly_chart(fig, use_container_width=True)
 #     
-    
-
-
-   
-  
 
 
 # ======== PAGINATION FUNCTION ======== 
@@ -226,7 +229,7 @@ def pagination(df):
     total_pages = (total_rows - 1) // rows_per_page + 1 
 
 
-    page = st.number_input("Sida", min_value=1, max_value=total_pages, value=1, step=1)
+    page = st.number_input("Sida", min_value=0, max_value=total_pages, value=1, step=1)
 
     start_idx = (page - 1) * rows_per_page
     end_idx = min(start_idx + rows_per_page, total_rows)
@@ -250,6 +253,10 @@ def main():
     filters = display_sidebar(df)
     filtered_df = apply_sidebar_filters(df, filters)
 
+    if check_if_dataframe_empty(df, "Inga efter inläsning från databasen."):       
+        return
+    if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
+        return
     
 
     # Selection of columns to view in the table
@@ -285,6 +292,7 @@ def main():
     # Display the pagination
     current_page_df = pagination(display_df)
     st.dataframe(current_page_df, use_container_width=True)
+    
 
     with column6:
         ads_per_week(filtered_df)
