@@ -3,14 +3,14 @@ from utils import DataBase_Connection
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo #Necessary for timezone conversion
 
 # ======= PAGE SETUP ========
 
 now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
 
-#st.success("Annonserna hämtas från Arbetsförmedlingen och uppdateras varje natt.") #if I use a dagster pipeline
+#st.success("Annonserna hämtas från Arbetsförmedlingen och uppdateras varje natt.") #If I manage to use a dagster pipeline
 
 # ======== LOADING DATA FUNCTION ========
 
@@ -29,12 +29,23 @@ def load_data():
 
 def display_sidebar(df):
     st.sidebar.header("Filtrera ditt urval")    
+
+    if st.sidebar.button("Rensa filter"):
+        st.session_state["occupation_group"] = "Alla"
+        st.session_state["occupation"] = "Alla"
+        st.session_state["region"] = "Alla"
+        st.session_state["employment_type"] = "Alla"
+        st.session_state["driving_license_required"] = False
+        st.session_state["own_car_required"] = False
+        st.session_state["experience_required"] = False
+        st.rerun()
     
     # Add a selectbox for job occupation_group selection
     occupation_group = df['occupation_group'].dropna().unique()
     selected_occupation_group = st.sidebar.selectbox(
         "Välj yrkesområde:", 
-        ["Alla"] + sorted(occupation_group.tolist())
+        ["Alla"] + sorted(occupation_group.tolist()),
+        key="occupation_group"
     )
     
     # Add a selection for job occupation selection, and filter the DataFrame based on the selected occupation_group
@@ -46,7 +57,8 @@ def display_sidebar(df):
     occupation = df_filtered_by_group['occupation'].dropna().unique()
     selected_occupation = st.sidebar.selectbox(
         "Välj yrke:", 
-        ["Alla"] + sorted(occupation.tolist())
+        ["Alla"] + sorted(occupation.tolist()),
+        key="occupation"
     ) 
 
     if selected_occupation != "Alla":
@@ -57,24 +69,36 @@ def display_sidebar(df):
     region = df_filtered_by_group['workplace_region'].dropna().unique()
     selected_region = st.sidebar.selectbox(
         "Välj län:", 
-        ["Alla"] + sorted(region.tolist())
+        ["Alla"] + sorted(region.tolist()),
+        key="region"
+    )
+
+    # Add a selectbox for employment type selection
+    employment_type = df_filtered_by_group['employment_type'].dropna().unique()
+    selected_employment_type = st.sidebar.selectbox(
+        "Välj anställningsform:", 
+        ["Alla"] + sorted(employment_type.tolist()),
+        key="employment_type"
     )
 
     # Add checkboxes for aux-attributes
-    require_driving_license = st.sidebar.checkbox("Körkort krävs", value=False)
-    require_own_car = st.sidebar.checkbox("Egen bil krävs", value=False)
-    require_experience = st.sidebar.checkbox("Erfarenhet krävs", value=False)
+    require_driving_license = st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
+    require_own_car = st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
+    require_experience = st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
+
+  
 
     filters = {
         "occupation_group": selected_occupation_group,
         "occupation": selected_occupation,
         "region": selected_region,
+        "employment_type": selected_employment_type,
         "driving_license_required": require_driving_license,
         "own_car_required": require_own_car,
         "experience_required": require_experience
     }
-
     return filters
+     
 
 def apply_sidebar_filters(df, filters):
     filtered_df = df.copy()
@@ -85,6 +109,8 @@ def apply_sidebar_filters(df, filters):
         filtered_df = filtered_df[filtered_df["occupation"] == filters["occupation"]]
     if filters["region"] != "Alla":
         filtered_df = filtered_df[filtered_df["workplace_region"] == filters["region"]]
+    if filters["employment_type"] != "Alla":
+        filtered_df = filtered_df[filtered_df["employment_type"] == filters["employment_type"]]
     if filters["driving_license_required"]:
         filtered_df = filtered_df[filtered_df["driving_license_required"] == True]
     if filters["own_car_required"]:
@@ -93,6 +119,8 @@ def apply_sidebar_filters(df, filters):
         filtered_df = filtered_df[filtered_df["experience_required"] == True]
 
     return filtered_df
+
+
     
 
 # ======== SHOW METRIC DATA FUNCTION ========
@@ -115,41 +143,76 @@ def show_metric_data(df):
         st.metric("Antal län", unique_regions)
     
 
+# ===== ==== VISUALIZATION FUNCTIONS ========
 
-
-# column4, column5 = st.columns(2)
-
-# with column4:    
+#
 #     cutoff_date = datetime.today() - timedelta(days=30)
-#     df_trending_ads = df_trending_ads[df_trending_ads["publication_date"] >= cutoff_date]
+# #     df_trending_ads = df_trending_ads[df_trending_ads["publication_date"] >= cutoff_date]
 
-#     trend_df = (
-#         df_trending_ads.groupby(df_trending_ads["publication_date"].dt.date)
-#         .size()
-#         .reset_index(name="count")
-#         .sort_values(by="publication_date")
-#     )
-#     fig = px.line(
-#         trend_df,
-#         x="publication_date",
-#         y="count",
-#         title="Antal annonser publicerade de senaste 30 dagarna",
-#         labels={"publication_date": "Datum", "count": "Antal annonser"},
-#     )
-#     st.plotly_chart(fig, use_container_width=True)
+# #     trend_df = (
+# #         df_trending_ads.groupby(df_trending_ads["publication_date"].dt.date)
+# #         .size()
+# #         .reset_index(name="count")
+# #         .sort_values(by="publication_date")
+# #     )
+# #     fig = px.line(
+# #         trend_df,
+# #         x="publication_date",
+# #         y="count",
+# #         title="Antal annonser publicerade de senaste 30 dagarna",
+# #         labels={"publication_date": "Datum", "count": "Antal annonser"},
+# #     )
+# #     st.plotly_chart(fig, use_container_width=True)
 
-# with column5:    
-#     employment_type_counts = df["employment_type"].value_counts()
-#     fig = px.pie(
-#         employment_type_counts,
-#         values=employment_type_counts.values,
-#         names=employment_type_counts.index,
-#         title="Fördelning av annonser per anställningstyp",
-#         labels={"value": "Anställningstyp", "name": "Antal annonser"},
-#     )
-#     fig.update_traces(textposition="inside", textinfo="percent+label")
-#     fig.update_layout(showlegend=False)
-#     st.plotly_chart(fig, use_container_width=True)
+def employment_type_distribution(df):
+    st.markdown("#### Fördelning av annonser utifrån anställningstyp")
+
+    employment_type_counts = df["employment_type"].value_counts()
+
+    # Colors for the charts
+    custom_greens = px.colors.sequential.Greens[2:5]  # ['#c2e699', '#78c679', '#31a354']
+
+    fig = px.pie(
+            employment_type_counts,
+            values=employment_type_counts.values,
+            names=employment_type_counts.index,
+            title="Fördelning av annonser per anställningstyp",
+            #labels={"value": "Anställningstyp", "name": "Antal annonser"},
+            color_discrete_sequence=custom_greens,
+            hole=0.4,
+        )
+    #fig.update_traces(textposition="inside", textinfo="percent+label")
+    fig.update_layout(showlegend=True)
+    st.plotly_chart(fig, use_container_width=True)
+        
+
+def ads_per_week(df):
+    st.markdown("#### Antal annonser publicerade per vecka")
+
+    df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
+
+
+    weekly_counts = (
+        df.groupby("week")
+        .size()
+        .reset_index(name="count")
+        .sort_values(by="week")
+    )
+    fig = px.bar(
+        weekly_counts,
+        x="week",
+        y="count",
+        title="Antal annonser publicerade per vecka",
+        labels={"week": "Vecka", "count": "Antal annonser"},
+        color_continuous_scale=px.colors.sequential.Greens,
+        color="count",
+        color_discrete_sequence=px.colors.qualitative.Plotly,
+    )                               
+    st.plotly_chart(fig, use_container_width=True)
+#     
+    
+
+
    
   
 
@@ -179,6 +242,7 @@ def main():
     
     st.set_page_config(page_title="HR Analytics Dashboard", layout="wide")
     st.title("Yrkesområden med social inriktning")
+    st.markdown("---")
   
 
     # Load the data
@@ -207,12 +271,23 @@ def main():
 )
 
     show_metric_data(filtered_df)
+    st.markdown("---")
+
+    column5, column6 = st.columns(2)
+
+    
+
+    with column5:
+        employment_type_distribution(filtered_df)
   
     # Display the data    
     #st.dataframe(display_df, use_container_width=True)
     # Display the pagination
     current_page_df = pagination(display_df)
     st.dataframe(current_page_df, use_container_width=True)
+
+    with column6:
+        ads_per_week(filtered_df)
 
    
 
