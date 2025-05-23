@@ -23,6 +23,7 @@ WITH
             jd.employment_type,
             jd.scope_of_work_min,
             jd.scope_of_work_max,
+            jd.application_url,
             a.driving_license_required,
             a.own_car_required,
             a.experience_required,

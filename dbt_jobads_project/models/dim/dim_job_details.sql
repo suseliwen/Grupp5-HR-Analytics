@@ -6,6 +6,7 @@ SELECT
     CAST(publication_date AS DATE) AS publication_date,
     COALESCE (description, 'Ingen data') AS description,
     COALESCE (description_html_formatted, 'Ingen data') AS description_html_formatted,
+    COALESCE (application_url, 'Ingen data') AS application_url,
     COALESCE (employment_type, 'Ingen data') AS employment_type,
     COALESCE(duration, 'Ingen data') AS duration,
     COALESCE (salary_type, 'Ingen data') AS salary_type,
