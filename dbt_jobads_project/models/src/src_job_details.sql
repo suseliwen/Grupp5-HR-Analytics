@@ -10,6 +10,7 @@ SELECT
     duration__label AS duration,
     salary_type__label AS salary_type,
     scope_of_work__min AS scope_of_work_min,
-    scope_of_work__max AS scope_of_work_max
+    scope_of_work__max AS scope_of_work_max,
+    application_details__url AS application_url,
 FROM stg_job_ads
 WHERE id IS NOT NULL

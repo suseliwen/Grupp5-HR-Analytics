@@ -149,21 +149,65 @@ def apply_sidebar_filters(df, filters):
 def show_metric_data(df):
     st.markdown("#### Sammanfattning av annonser utifrån dina val")
     
-    column1, column2, column3, column4 = st.columns(4)
-    unique_regions = df['workplace_region'].nunique()
+    column1, column2, column3 = st.columns(3)     
+    column4, column5, column6 = st.columns(3)
     
-    with column1:
-        st.metric("Antal annonser", df.shape[0])
+    with column1:       
+        df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
+        weekly_counts = (
+        df.groupby("week")
+        .size()
+        .reset_index(name="count")
+        .sort_values("week")
+        )
+
+        if len(weekly_counts) >= 1:
+            latest = weekly_counts.iloc[-1]
+            previous = weekly_counts.iloc[-2]
+
+            st.metric(
+                label=f"Annonser vecka {int(latest['week'])}",
+                value=int(latest['count']),
+                delta=int(latest['count']) - int(previous['count'])
+            )
 
     with column2:
-        st.metric("Antal unika yrkesområden", df['occupation_group'].nunique())
+        st.metric("Antal unika yrken", df['occupation'].nunique()) 
     
     with column3:
         st.metric("Antal unika arbetsgivare", df['employer_name'].nunique())
-
-    with column4:
-        st.metric("Antal län", unique_regions)
     
+    with column4:
+        st.metric("Antal annonser", df.shape[0])
+        with st.popover("Visa antal annonser per vecka"):
+            st.markdown("Antal annonser de senaste veckorna")
+            
+            weeks = weekly_counts["week"].astype(str).apply(lambda w: f"v{w}")
+            counts = weekly_counts["count"]
+        
+            fig = px.bar(x=weeks, y=counts, labels={"x": "Vecka", "y": "Antal annonser"})
+            st.plotly_chart(fig, use_container_width=True)       
+    
+    with column5:
+        st.metric("Det mest eftersökta yrket", df['occupation'].value_counts().idxmax())
+        with st.popover("Visa topp 5 yrken"):
+            st.markdown("Topp 5 yrken")
+            
+            counts = df['occupation'].value_counts().nlargest(5)
+
+            fig = px.bar(x=counts.index, y=counts.values, labels={"x": "Yrke", "y": "Antal annonser"})  
+            st.plotly_chart(fig, use_container_width=True)      
+    
+    with column6:
+        st.metric("Den arbetsgivare som annonserat mest", df['employer_name'].value_counts().idxmax())
+        with st.popover("Visa topp 5 arbetsgivare"):
+            st.markdown("Topp 5 arbetsgivare")
+            
+            counts = df['employer_name'].value_counts().nlargest(5)
+
+            fig = px.bar(x=counts.index, y=counts.values, labels={"x": "Arbetsgivare", "y": "Antal annonser"})  
+            st.plotly_chart(fig, use_container_width=True)     
+     
 
 # ======== PLOTTING FUNCTIONS ========
 def employment_type_distribution(df):
@@ -237,8 +281,6 @@ def pagination(df):
     st.markdown(f"Visar {len(current_page_df)} rader (av {len(df)} matchande annonser)")
     return current_page_df
 
-
-
 # ======== MAIN FUNCTION ========
 
 def main():
@@ -258,47 +300,50 @@ def main():
     if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
         return
     
-
+    filtered_df["Annons"] = filtered_df["application_url"].apply(
+        lambda x: f'<a href="{x}" target="_blank">Öppna annons</a>'
+    )
+    
     # Selection of columns to view in the table
     columns_to_show = {
-    "publication_date": "Publiceringsdatum",
+    "publication_date": "Publiceringsdatum",    
     "headline": "Rubrik",
     "employer_name": "Arbetsgivare",
     "occupation": "Yrkestitel",
     "occupation_group": "Yrkesområde",
     "workplace_region": "Län",      
-    "application_deadline": "Sista ansökningsdag"
+    #"Annons": "Annons",    
 }
 
     display_df = (
-    filtered_df
-    .sort_values("publication_date", ascending=False)  # sortera senaste först
-    [list(columns_to_show.keys())]
-    .rename(columns=columns_to_show)
+        filtered_df
+        .sort_values("publication_date", ascending=False) 
+        [list(columns_to_show.keys())]
+        .rename(columns=columns_to_show)
 )
 
     show_metric_data(filtered_df)
     st.markdown("---")
 
     column5, column6 = st.columns(2)
-
-    
-
+   
     with column5:
         employment_type_distribution(filtered_df)
   
-    # Display the data    
+    # Display the data - without the HTML table    
     #st.dataframe(display_df, use_container_width=True)
-    # Display the pagination
     current_page_df = pagination(display_df)
     st.dataframe(current_page_df, use_container_width=True)
+   
+   
+    # # Display the pagination - with the HTML table
+    # current_page_df = pagination(display_df)
+    # st.markdown(current_page_df.to_html(escape=False, index=False), unsafe_allow_html=True)
     
 
     with column6:
         ads_per_week(filtered_df)
-
    
-
 
 if __name__ == "__main__":
     main()
