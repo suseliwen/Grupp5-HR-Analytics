@@ -139,3 +139,48 @@ div.block-container {
 .stSpinner > div {
   border-color: #9c0000 !important;
 }
+
+/* Map CSS */
+
+/* Map styling for HR Analytics Dashboard */
+.map-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #1e6091;
+}
+
+/* Responsive map container */
+.map-container {
+  width: 100%;
+  height: auto;
+  min-height: 300px;
+}
+
+/* Ensure charts are responsive */
+.js-plotly-plot {
+  width: 100% !important;
+}
+
+/* Media queries for different screen sizes */
+@media (max-width: 768px) {
+  .map-title {
+    font-size: 16px;
+  }
+
+  /* Adjust plotly charts on mobile */
+  .js-plotly-plot .plotly {
+    height: 400px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .map-title {
+    font-size: 14px;
+  }
+
+  /* Smaller height on mobile */
+  .js-plotly-plot .plotly {
+    height: 350px !important;
+  }
+}
