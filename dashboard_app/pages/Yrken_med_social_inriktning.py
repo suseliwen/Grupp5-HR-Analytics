@@ -52,7 +52,7 @@ def check_if_dataframe_empty(df, messsage):
 def display_sidebar(df):
     st.sidebar.header("Filtrera ditt urval")    
 
-    if st.sidebar.button("Rensa filter"):
+    if st.sidebar.button("Rensa filter", key="reset_filters"):
         st.session_state["occupation_group"] = "Alla"
         st.session_state["occupation"] = "Alla"
         st.session_state["region"] = "Alla"
@@ -185,7 +185,14 @@ def show_metric_data(df):
             weeks = weekly_counts["week"].astype(str).apply(lambda w: f"v{w}")
             counts = weekly_counts["count"]
         
-            fig = px.bar(x=weeks, y=counts, labels={"x": "Vecka", "y": "Antal annonser"})
+            fig = px.bar(
+                x=weeks, 
+                y=counts, 
+                labels={"x": "Vecka", "y": "Antal annonser"},
+                color=counts,
+                color_continuous_scale=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
+            )
+            fig.update_layout(xaxis_tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)       
     
     with column5:
@@ -195,7 +202,14 @@ def show_metric_data(df):
             
             counts = df['occupation'].value_counts().nlargest(5)
 
-            fig = px.bar(x=counts.index, y=counts.values, labels={"x": "Yrke", "y": "Antal annonser"})  
+            fig = px.bar(
+                x=counts.index, 
+                y=counts.values, 
+                labels={"x": "Yrke", "y": "Antal annonser"},
+                color=counts,
+                color_continuous_scale=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
+            )
+            fig.update_layout(xaxis_tickangle=-45) 
             st.plotly_chart(fig, use_container_width=True)      
     
     with column6:
@@ -205,7 +219,14 @@ def show_metric_data(df):
             
             counts = df['employer_name'].value_counts().nlargest(5)
 
-            fig = px.bar(x=counts.index, y=counts.values, labels={"x": "Arbetsgivare", "y": "Antal annonser"})  
+            fig = px.bar(
+                x=counts.index, 
+                y=counts.values, 
+                labels={"x": "Arbetsgivare", "y": "Antal annonser"}, 
+                color=counts,
+                color_continuous_scale=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
+            )
+            fig.update_layout(xaxis_tickangle=-60)
             st.plotly_chart(fig, use_container_width=True)     
      
 
@@ -219,7 +240,7 @@ def employment_type_distribution(df):
     employment_type_counts = df["employment_type"].value_counts()
 
     # Colors for the charts
-    custom_greens = px.colors.sequential.Greens[2:5]  # ['#c2e699', '#78c679', '#31a354']
+    custom_greens = px.colors.sequential.Greens[2:5]  # ['#00441b', '#006d2c', '#238b45', "#41ae76", "#66c2a4", "#99d8c9"]  
 
     fig = px.pie(
             employment_type_counts,
@@ -227,7 +248,7 @@ def employment_type_distribution(df):
             names=employment_type_counts.index,
             title="Fördelning av annonser per anställningstyp",
             #labels={"value": "Anställningstyp", "name": "Antal annonser"},
-            color_discrete_sequence=custom_greens,
+            color_discrete_sequence=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
             hole=0.4,
         )
     #fig.update_traces(textposition="inside", textinfo="percent+label")
@@ -256,7 +277,7 @@ def ads_per_week(df):
         y="count",
         title="Antal annonser publicerade per vecka",
         labels={"week": "Vecka", "count": "Antal annonser"},
-        color_continuous_scale=px.colors.sequential.Greens,
+        color_continuous_scale=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
         color="count",
         color_discrete_sequence=px.colors.qualitative.Plotly,
     )                               
