@@ -1,6 +1,4 @@
 
-
-
 WITH stg_job_ads AS (
     SELECT *,
            ROW_NUMBER() OVER (
