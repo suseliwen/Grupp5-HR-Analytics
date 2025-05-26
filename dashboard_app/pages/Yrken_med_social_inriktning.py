@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import DataBase_Connection
+from utils import load_data
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
@@ -13,33 +13,14 @@ logging.basicConfig(
     level=logging.ERROR, 
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-
 # ======= PAGE SETUP ========
 
 now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
 
 #st.success("Annonserna hämtas från Arbetsförmedlingen och uppdateras varje natt.") #If I manage to use a dagster pipeline
 
-# ======== LOADING DATA FUNCTION ========
-
-def load_data():
-    try:
-        with DataBase_Connection() as conn:       
-            df = conn.execute("SELECT * FROM mart.mart_occupation_social").fetchdf()      
-                    
-            df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
-            df["application_deadline"] = pd.to_datetime(df["application_deadline"], errors="coerce").dt.date
-            df = df[df["application_deadline"] >= now]
-        return df
-        
-    except Exception as e:
-        logging.error(f"Fel vid inläsning av data", exc_info=True)       
-        st.error(f"Fel vid inläsning av data: {e}")
-        return pd.DataFrame()    
-    
-  
+   
 # ======= ERROR HANDLING ========
-
 def check_if_dataframe_empty(df, messsage):
     if df.empty:
         logging.warning(messsage)
@@ -47,20 +28,23 @@ def check_if_dataframe_empty(df, messsage):
         return True
     return False
 
-# ======== DISPLAY SIDEBAR FUNCTION ========
+# ======= RESET SIDEBAR FILTERS FUNCTION ========
+def reset_sidebar_filters():
+    st.session_state["occupation_group"] = "Alla"
+    st.session_state["occupation"] = "Alla"
+    st.session_state["region"] = "Alla"
+    st.session_state["employment_type"] = "Alla"
+    st.session_state["driving_license_required"] = False
+    st.session_state["own_car_required"] = False
+    st.session_state["experience_required"] = False
+    st.rerun()
 
+# ======== DISPLAY SIDEBAR FUNCTION ========
 def display_sidebar(df):
     st.sidebar.header("Filtrera ditt urval")    
 
     if st.sidebar.button("Rensa filter", key="reset_filters"):
-        st.session_state["occupation_group"] = "Alla"
-        st.session_state["occupation"] = "Alla"
-        st.session_state["region"] = "Alla"
-        st.session_state["employment_type"] = "Alla"
-        st.session_state["driving_license_required"] = False
-        st.session_state["own_car_required"] = False
-        st.session_state["experience_required"] = False
-        st.rerun()
+        reset_sidebar_filters()
     
     # Add a selectbox for job occupation_group selection
     occupation_group = df['occupation_group'].dropna().unique()
@@ -121,7 +105,6 @@ def display_sidebar(df):
     }
     return filters
      
-
 def apply_sidebar_filters(df, filters):
     filtered_df = df.copy()
 
@@ -142,8 +125,29 @@ def apply_sidebar_filters(df, filters):
 
     return filtered_df
 
-
+# ======= DISPLAY DATAFRAME FUNCTION ========
+def create_display_df(filtered_df):    
     
+    # Define the columns to display
+    columns_to_show = {
+        "publication_date": "Publiceringsdatum",
+        "headline": "Rubrik",
+        "employer_name": "Arbetsgivare",
+        "occupation": "Yrkestitel",
+        "occupation_group": "Yrkesområde",
+        "workplace_region": "Län",
+        "application_deadline": "Sista ansökningsdag",
+        "application_url": "Annons",
+    }
+    
+    # Create a new DataFrame with the selected columns
+    display_df = (
+        filtered_df
+        .sort_values("publication_date", ascending=False)
+        [list(columns_to_show.keys())]
+        .rename(columns=columns_to_show)               
+    )
+    return display_df
 
 # ======== SHOW METRIC DATA FUNCTION ========
 def show_metric_data(df):
@@ -151,26 +155,33 @@ def show_metric_data(df):
     
     column1, column2, column3 = st.columns(3)     
     column4, column5, column6 = st.columns(3)
-    
-    with column1:       
+
+    with column1:
         df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
         weekly_counts = (
-        df.groupby("week")
-        .size()
-        .reset_index(name="count")
-        .sort_values("week")
-        )
-
-        if len(weekly_counts) >= 1:
+            df.groupby("week")
+            .size()
+            .reset_index(name="count")
+            .sort_values("week")
+        )    
+        if len(weekly_counts) >= 2:
+                latest = weekly_counts.iloc[-1]
+                previous = weekly_counts.iloc[-2]
+                st.metric(
+                    label=f"Annonser vecka {int(latest['week'])}",
+                    value=int(latest['count']),
+                    delta=int(latest['count']) - int(previous['count'])
+                )
+        elif len(weekly_counts) == 1:
             latest = weekly_counts.iloc[-1]
-            previous = weekly_counts.iloc[-2]
-
             st.metric(
                 label=f"Annonser vecka {int(latest['week'])}",
                 value=int(latest['count']),
-                delta=int(latest['count']) - int(previous['count'])
+                delta="Ingen föregående vecka"
             )
-
+        else:
+            st.metric("Annonser per vecka", "Inga data")
+    
     with column2:
         st.metric("Antal unika yrken", df['occupation'].nunique()) 
     
@@ -228,7 +239,6 @@ def show_metric_data(df):
             )
             fig.update_layout(xaxis_tickangle=-60)
             st.plotly_chart(fig, use_container_width=True)     
-     
 
 # ======== PLOTTING FUNCTIONS ========
 def employment_type_distribution(df):
@@ -254,7 +264,6 @@ def employment_type_distribution(df):
     #fig.update_traces(textposition="inside", textinfo="percent+label")
     fig.update_layout(showlegend=True)
     st.plotly_chart(fig, use_container_width=True)
-        
 
 def ads_per_week(df):
     if df.empty or df["publication_date"].dropna().empty:
@@ -282,8 +291,6 @@ def ads_per_week(df):
         color_discrete_sequence=px.colors.qualitative.Plotly,
     )                               
     st.plotly_chart(fig, use_container_width=True)
-#     
-
 
 # ======== PAGINATION FUNCTION ======== 
 def pagination(df):
@@ -308,11 +315,13 @@ def main():
     
     st.set_page_config(page_title="HR Analytics Dashboard", layout="wide")
     st.title("Yrkesområden med social inriktning")
+    st.progress(0.1)  # Show a progress bar while loading data
     st.markdown("---")
+    
   
 
     # Load the data
-    df = load_data()
+    df = load_data("mart.mart_occupation_social")
     filters = display_sidebar(df)
     filtered_df = apply_sidebar_filters(df, filters)
 
@@ -321,38 +330,21 @@ def main():
     if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
         return
     
-    filtered_df["Annons"] = filtered_df["application_url"].apply(
-        lambda x: f'<a href="{x}" target="_blank">Öppna annons</a>'
-    )
-    
-    # Selection of columns to view in the table
-    columns_to_show = {
-    "publication_date": "Publiceringsdatum",    
-    "headline": "Rubrik",
-    "employer_name": "Arbetsgivare",
-    "occupation": "Yrkestitel",
-    "occupation_group": "Yrkesområde",
-    "workplace_region": "Län",      
-    #"Annons": "Annons",    
-}
+    display_df = create_display_df(filtered_df)
 
-    display_df = (
-        filtered_df
-        .sort_values("publication_date", ascending=False) 
-        [list(columns_to_show.keys())]
-        .rename(columns=columns_to_show)
-)
 
     show_metric_data(filtered_df)
     st.markdown("---")
 
-    column5, column6 = st.columns(2)
+    column1, column2 = st.columns(2)
    
-    with column5:
+    with column1:
         employment_type_distribution(filtered_df)
+    
+    with column2:
+        ads_per_week(filtered_df)
   
     # Display the data - without the HTML table    
-    #st.dataframe(display_df, use_container_width=True)
     current_page_df = pagination(display_df)
     st.dataframe(current_page_df, use_container_width=True)
    
@@ -360,11 +352,7 @@ def main():
     # # Display the pagination - with the HTML table
     # current_page_df = pagination(display_df)
     # st.markdown(current_page_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-    
-
-    with column6:
-        ads_per_week(filtered_df)
-   
+ 
 
 if __name__ == "__main__":
     main()
