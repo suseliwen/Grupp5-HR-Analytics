@@ -15,6 +15,7 @@ pipeline_job = define_asset_job(
 # Define a schedule to run the job daily at midnight
 daily_schedule = ScheduleDefinition(
     job_name=pipeline_job.name,
+
     cron_schedule="0 6,18 * * *",  # Every day at midnight
 )
 
@@ -22,5 +23,5 @@ daily_schedule = ScheduleDefinition(
 defs = Definitions(
     assets=all_assets,
     jobs=[pipeline_job],
-    schedules=[daily_schedule],
 )
+
