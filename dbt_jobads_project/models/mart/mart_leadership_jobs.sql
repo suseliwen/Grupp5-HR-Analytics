@@ -22,9 +22,13 @@ WITH
             e.employer_name,
             e.employer_workplace,
             e.workplace_region,
+            e.workplace_municipality,
+            e.workplace_city, 
             jd.employment_type,
             jd.scope_of_work_min,
             jd.scope_of_work_max,
+            jd.application_url,
+            jd.description_html_formatted,
             a.driving_license_required,
             a.own_car_required,
             a.experience_required
