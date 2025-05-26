@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import altair as alt
 import plotly.express as px
-from utils import DataBase_Connection
+from utils import load_data
 from map.hr_map import create_hr_map
 
 
@@ -37,9 +37,8 @@ mart_table = occupation_to_mart[select_occupation_field]
 
 # ======== DATA LOADING ========
 
-#Open data with context manager
-with DataBase_Connection() as conn:
-    df = conn.execute(f"SELECT * FROM {mart_table}").fetchdf()
+#Open data with load_data function
+df = load_data(mart_table)
 
 
 #======== SIDEBAR ========
