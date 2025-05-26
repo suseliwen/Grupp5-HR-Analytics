@@ -1,4 +1,4 @@
-from dagster import asset, AssetIn
+from dagster import asset, AssetIn, AssetMaterialization, Output
 from pathlib import Path
 import sys
 import subprocess
@@ -39,3 +39,9 @@ def run_dbt_transformations():
     """
     dbt_path = Path(__file__).resolve().parents[2] / "dbt_jobads_project"
     subprocess.run(["dbt", "run", "--project-dir", str(dbt_path)], check=True)
+
+    yield AssetMaterialization(
+        asset_key="run_dbt_transformations",
+        description="DBT transformations have been successfully run on the job_ads data.",
+    )
+    yield Output("DBT transformations completed successfully.")
