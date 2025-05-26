@@ -2,7 +2,7 @@ import streamlit as st
 from utils import DataBase_Connection
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+
 
 # ======== PAGE CONFIGURATION ========
 st.set_page_config(page_title="Chefer och verksamhetsledare", layout="wide")
@@ -22,59 +22,21 @@ def load_leadership_data():
     try:
         with DataBase_Connection() as conn:
             # print("Available tables:", available_tables)
-            df = conn.execute("SELECT * FROM mart.mart_leadership_jobs").fetchdf()
-            
-            # For debugging - print columns (can be removed in production)
-            print("Available columns:", df.columns.tolist())
-            
-            # Check if publication_date exists, if not try alternative column names
-            if 'publication_date' not in df.columns:
-                # Try common alternative column names
-                alt_columns = ['post_date', 'posted_date', 'listing_date', 'created_at', 'creation_date']
-                for alt_col in alt_columns:
-                    if alt_col in df.columns:
-                        df['publication_date'] = df[alt_col]
-                        print(f"Using '{alt_col}' as publication date")
-                        break             
-                # If still not found, create a dummy column with publication dates
-                # spanning the last 12 months for visualization purposes
-                if 'publication_date' not in df.columns:
-                    print("No publication date column found. Creating dummy data for visualization.")
-                    now = pd.Timestamp.now()
-                    # Create dates spanning the last 12 months
-                    df['publication_date'] = pd.date_range(
-                        end=now, 
-                        periods=len(df), 
-                        freq='D'
-                    )[:len(df)]
-                    
-                    # Shuffle the dates to avoid artificial patterns
-                    df['publication_date'] = df['publication_date'].sample(frac=1).reset_index(drop=True)
-    
-        # Convert date columns
+            df = conn.execute("SELECT * FROM mart.mart_leadership_jobs").fetchdf()                    
+        # Convert date columns if they exist
+        for date_col in ['application_deadline', 'publication_date']:
+            if date_col in df.columns:
+                df[date_col] = pd.to_datetime(df[date_col])
+                if df[date_col].dt.tz is not None:
+                    df[date_col] = df[date_col].dt.tz_localize(None)
+        # Add flag for open jobs
         if 'application_deadline' in df.columns:
-            df['application_deadline'] = pd.to_datetime(df['application_deadline'])
-            if df['application_deadline'].dt.tz is not None:
-                df['application_deadline'] = df['application_deadline'].dt.tz_localize(None)
-        
-        if 'publication_date' in df.columns:
-            df['publication_date'] = pd.to_datetime(df['publication_date'])
-            if df['publication_date'].dt.tz is not None:
-                df['publication_date'] = df['publication_date'].dt.tz_localize(None)
-        
-        # Add flag for open jobs (can still be applied to)
-        now = pd.Timestamp.now()
-        if 'application_deadline' in df.columns:
-            df['is_open'] = df['application_deadline'] >= now
-        
+            df['is_open'] = df['application_deadline'] >= pd.Timestamp.now()
         return df
     
     except Exception as e:
-        print(f"Error loading data: {e}")
-        # Return empty DataFrame with expected columns to prevent downstream errors
-        return pd.DataFrame(columns=['occupation', 'employer_name', 'workplace_municipality', 
-                                    'workplace_region', 'publication_date', 'application_deadline', 
-                                    'is_open'])
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
 
 
 # ======== METRICS VISUALIZATION FUNCTIONS ========
@@ -83,41 +45,35 @@ def show_leadership_metrics(df, filtered_df=None):
     if filtered_df is None:
         filtered_df = df
     
+    if filtered_df.empty:
+        st.warning("Inga annonser matchar filtren")
+        return
+    
     total_jobs = len(df)
     filtered_jobs = len(filtered_df)
-    
-    # Calculate number of open jobs
-    if 'is_open' in filtered_df.columns:
-        active_jobs = filtered_df['is_open'].sum()
-    else:
-        active_jobs = "Okänt"
-    
+    active_jobs = filtered_df['is_open'].sum() if 'is_open' in filtered_df.columns else "Okänt"
     unique_occupations = filtered_df['occupation'].nunique() if 'occupation' in filtered_df.columns else 0
     unique_employers = filtered_df['employer_name'].nunique() if 'employer_name' in filtered_df.columns else 0
-    
-    # Safely filter for regions with data
+    unique_regions = filtered_df['workplace_region'].nunique() if 'workplace_region' in filtered_df.columns else 0  
+    # Filter out "Ingen data" from regions count
     if 'workplace_region' in filtered_df.columns:
-        region_df = filtered_df[filtered_df['workplace_region'] != 'Ingen data']
-        unique_regions = region_df['workplace_region'].nunique() 
+        regions_clean = filtered_df[filtered_df['workplace_region'] != 'Ingen data']['workplace_region']
+        unique_regions = regions_clean.nunique()
     else:
-        unique_regions = 0
-    
-    # Display metrics in two rows for better layout
+        unique_regions = 0   
+    # Display metrics
     col1, col2, col3 = st.columns(3)
     col4, col5, col6 = st.columns(3)
     
     col1.metric("Totala chefsannonser", filtered_jobs)
     col2.metric("Aktiva annonser", active_jobs)
     col3.metric("Unika chefsroller", unique_occupations)
-    
     col4.metric("Unika arbetsgivare", unique_employers)
-    col5.metric("Unika län", unique_regions)
-
-    # Show percentage of open jobs if data exists
+    col5.metric("Län med chefsannonser", unique_regions)
+    # Show percentage of open jobs
     if isinstance(active_jobs, (int, float)) and filtered_jobs > 0:
         percent_open = (active_jobs / filtered_jobs) * 100
-        col6.metric("Procent öppna jobb", f"{percent_open:.1f}%")
-    
+        col6.metric("Procent öppna jobb", f"{percent_open:.1f}%")    
     # Information about filtering
     if filtered_jobs < total_jobs:
         st.info(f"**Filtrerad vy:** Visar {filtered_jobs} av totalt {total_jobs} annonser baserat på valda filter.")
@@ -130,8 +86,7 @@ def show_role_chart(df):
         st.warning("Rolldiagram kan inte visas: yrkesdata saknas")
         return
     
-    st.subheader("Topp 10 chefsroller")
-    
+    st.subheader("Topp 10 chefsroller nationellt")    
     # Container with border and class for CSS styling
     with st.container():
         st.markdown('<div class="role-chart-container">', unsafe_allow_html=True)
@@ -157,7 +112,6 @@ def show_role_chart(df):
     )
     
     st.plotly_chart(fig, use_container_width=True)
-    
     # Close the container
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -168,53 +122,36 @@ def show_region_chart(df):
         st.warning("Länsdiagram kan inte visas: länsdata saknas")
         return
         
-    st.subheader("Topp 5 län")
-    
+    st.subheader("Topp 10 län med flest annonser")
     # Container with border and class for CSS styling
     with st.container():
         st.markdown('<div class="region-chart-container">', unsafe_allow_html=True)
     
-    with st.container():
         region_df = df[df['workplace_region'] != 'Ingen data']
         
         if region_df.empty:
             st.warning("Ingen giltig länsdata tillgänglig för visualisering")
             return
             
-        region_counts = region_df['workplace_region'].value_counts().head(5).reset_index()
+        region_counts = region_df['workplace_region'].value_counts().head(10).reset_index()
         region_counts.columns = ['Län', 'Antal']
         
         fig = px.bar(
-            region_counts,
-            x='Län',
-            y='Antal',
-            title="Antal chefsannonser per län",
-            labels={'Län': 'Län', 'Antal': 'Antal annonser'},
-            color='Antal',
-            color_continuous_scale=px.colors.sequential.Reds
-        )
-        
-        fig.update_traces(textposition='outside', texttemplate='%{y}')
-        fig.update_layout(
-            yaxis=dict(autorange="reversed"),
-            margin=dict(l=20, r=20, t=50, b=20),
-            title_font=dict(size=18, family="Helvetica"),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            height=400,
-            title_x=0.5,
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        # Close the container
-        st.markdown('</div>', unsafe_allow_html=True)
+        region_counts,
+        x='Län',
+        y='Antal',
+        title="Antal chefsannonser per län",
+        color='Antal',
+        color_continuous_scale=px.colors.sequential.Reds
+    )
+    
+    fig.update_traces(textposition='outside', texttemplate='%{y}')
+    st.plotly_chart(fig, use_container_width=True)
 
-
+# ======== CHART VISUALIZATION FUNCTIONS ========
 def show_municipality_chart(df):
     """Displays chart for municipalities with the most leadership job listings"""
-    
-    st.subheader("Topp 10 kommuner")
-    
+    st.subheader("Topp 10 kommuner med flest annonser")
     # Add container with class for CSS styling
     st.markdown('<div class="municipality-chart-container">', unsafe_allow_html=True)
     
@@ -222,114 +159,233 @@ def show_municipality_chart(df):
         # First check if the DataFrame is empty
         if df.empty:
             st.info("Ingen data tillgänglig för att visa kommundiagram")
-            return
-            
-        # Check if we have municipality data in the DataFrame
+            return           
+        # Only show if we have real municipality data
         if 'workplace_municipality' not in df.columns:
-            # Try to extract municipality from other columns if possible
-            if 'workplace_address' in df.columns:
-                st.info("Försöker härleda kommun från adressdata...")
-                # This is a simplified example - in reality, you'd need more sophisticated parsing
-                df['workplace_municipality'] = df['workplace_address'].str.split(',').str[-1].str.strip()
-            else:
-                # Create a placeholder municipality for demo purposes
-                st.info("Skapar exempeldata för kommundiagram")
-                import random
-                municipalities = ['Stockholm', 'Göteborg', 'Malmö', 'Uppsala', 'Västerås', 
-                                  'Örebro', 'Linköping', 'Helsingborg', 'Jönköping', 'Norrköping',
-                                  'Lund', 'Umeå', 'Gävle', 'Borås', 'Södertälje']
-                
-                # Generate random municipalities with weighted distribution
-                df['workplace_municipality'] = [random.choices(
-                    municipalities, 
-                    weights=[0.3, 0.2, 0.15, 0.1, 0.05, 0.05, 0.03, 0.03, 0.02, 0.02, 0.01, 0.01, 0.01, 0.01, 0.01], 
-                    k=1)[0] for _ in range(len(df))]
-        
-        # Filter out rows without municipality data
-        muni_df = df[df['workplace_municipality'].notna()]
-        # Also filter out "Ingen data" values if present
-        if 'Ingen data' in muni_df['workplace_municipality'].values:
-            muni_df = muni_df[muni_df['workplace_municipality'] != 'Ingen data']
-        
-        # If after filtering we have no data, show message
+            st.info("Kommundata saknas - lägg till 'workplace_municipality' i mart-filen")
+            return     
+        # Filter real municipality data
+        muni_df = df[df['workplace_municipality'].notna() & 
+                    (df['workplace_municipality'] != 'Ingen data')]
+        # If no valid municipality data, show info message   
         if muni_df.empty:
-            st.info("Ingen detaljerad kommundata tillgänglig")
-            return
-        
-        # Get counts by municipality
+            st.info("Ingen kommundata tillgänglig i denna data")
+            return       
+        # Get municipality counts
         muni_counts = muni_df['workplace_municipality'].value_counts().head(10).reset_index()
         muni_counts.columns = ['Kommun', 'Antal']
-        
-        # Create bar chart
+        title = f"Topp {len(muni_counts)} kommuner med flest chefsroller"        
+        # Create chart
         fig = px.bar(
-            muni_counts,
-            x='Antal',
-            y='Kommun',
-            orientation='h',
-            title="Topp 10 kommuner med flest chefsroller",
-            labels={'Kommun': 'Kommun', 'Antal': 'Antal annonser'},
-            color='Antal',
+            muni_counts, x='Antal', y='Kommun', orientation='h',
+            title=title, color='Antal',
             color_continuous_scale=px.colors.sequential.Reds
         )
         
         fig.update_traces(textposition='outside', texttemplate='%{x}')
-        fig.update_layout(
-            yaxis=dict(autorange="reversed"),  # Place highest values at top
-            margin=dict(l=20, r=20, t=30, b=20)
-        )
+        fig.update_layout(yaxis=dict(autorange="reversed"))
         
-        st.plotly_chart(fig, use_container_width=True)
-        # Close the container
-        st.markdown('</div>', unsafe_allow_html=True)
-    
+        st.plotly_chart(fig, use_container_width=True)        
+        # Show coverage info
+        coverage = (len(muni_df) / len(df)) * 100
+        st.caption(f"{len(muni_df)}/{len(df)} jobb ({coverage:.1f}%) har kommun-info")
+        
     except Exception as e:
-        st.warning(f"Kunde inte visa kommundiagram: {str(e)}")
-        # If there's an error, still show something useful
-        st.info("Använd filterfunktionen i sidofältet för att hitta jobb baserat på andra kriterier.")
+        st.error("Kunde inte visa kommundiagram")
+        print(f"Municipality chart error: {e}")
+    finally:
+        st.markdown('</div>', unsafe_allow_html=True)
 
-
+# ======== CHART VISUALIZATION FUNCTIONS ========
 def show_trend_chart(df):
-    """Displays trend chart for leadership recruitment over time (month). """
+    """Displays trend chart for leadership recruitment over time."""
     if 'publication_date' not in df.columns or df.empty:
         st.warning("Trenddiagram kan inte visas: publiceringsdatum saknas")
         return
         
     st.subheader("Trend för chefsrekryteringar")
-    # Add container with class for CSS styling
+    
     st.markdown('<div class="trend-chart-container">', unsafe_allow_html=True)
     
+    # Create copy and convert dates first
+    df_copy = df.copy()
+    df_copy['publication_date'] = pd.to_datetime(df_copy['publication_date'])
+    
+    # Filter data to only include years 2020-2025
+    df_copy = df_copy[(df_copy['publication_date'].dt.year >= 2020) & 
+                      (df_copy['publication_date'].dt.year <= 2025)]
+    
+    if df_copy.empty:
+        st.warning("Ingen data tillgänglig för åren 2020-2025")
+        return
+    
+    # Let user choose time granularity
+    time_granularity = st.selectbox(
+        "Välj tidsintervall:", 
+        ["Dag", "Vecka", "Månad", "År"], 
+        index=2  # Default to "Månad"
+    )
+    
+    # Group by selected time period
+    if time_granularity == "Dag":
+        # Group by actual date
+        trend_data = df_copy.groupby(df_copy['publication_date'].dt.date).size().reset_index(name='count')
+        trend_data['publication_date'] = pd.to_datetime(trend_data['publication_date'])
+        x_label = "Datum"
+        title = "Chefsrekrytering per dag"
+        tick_format = "%Y-%m-%d"
+        
+    elif time_granularity == "Vecka":
+        # Group by week
+        df_copy['period'] = df_copy['publication_date'].dt.to_period('W')
+        trend_data = df_copy.groupby('period').size().reset_index(name='count')
+        trend_data['period'] = trend_data['period'].dt.to_timestamp()
+        trend_data = trend_data.rename(columns={'period': 'publication_date'})
+        x_label = "Vecka"
+        title = "Chefsrekrytering per vecka"
+        tick_format = "%Y-%m"
+        
+    elif time_granularity == "Månad":
+        # Group by month
+        df_copy['period'] = df_copy['publication_date'].dt.to_period('M')
+        trend_data = df_copy.groupby('period').size().reset_index(name='count')
+        trend_data['period'] = trend_data['period'].dt.to_timestamp()
+        trend_data = trend_data.rename(columns={'period': 'publication_date'})
+        x_label = "Månad"
+        title = "Chefsrekrytering per månad"
+        tick_format = "%Y-%m"
+        
+    else:
+        # Group by year
+        df_copy['year'] = df_copy['publication_date'].dt.year
+        trend_data = df_copy.groupby('year').size().reset_index(name='count')        
+        # Fill missing years with 0
+        all_years = pd.DataFrame({'year': range(2020, 2026)})
+        trend_data = all_years.merge(trend_data, on='year', how='left').fillna(0)
+        trend_data = trend_data.rename(columns={'year': 'publication_date'})
+        x_label = "År"
+        title = "Chefsrekrytering per år"
+        tick_format = "%Y"   
+    # Check if we have enough data points
+    if len(trend_data) < 2:
+        st.warning(f"Inte tillräckligt med data för {time_granularity.lower()}svis analys")
+        return    
+    # Create the plot
+    fig = px.line(
+        trend_data,
+        x='publication_date',
+        y='count',
+        title=title,
+        labels={'publication_date': x_label, 'count': 'Antal annonser'}
+    )
+    
+    fig.update_traces(mode='lines+markers')
+    fig.update_xaxes(tickformat=tick_format)    
+    # Add some styling
+    if time_granularity == "År":
+        fig.update_xaxes(dtick=1, range=[2019.5, 2025.5])
+    
+    st.plotly_chart(fig, use_container_width=True)   
+    # Show some statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Totalt antal annonser", int(trend_data['count'].sum()))
+    with col2:
+        st.metric("Genomsnitt per period", f"{trend_data['count'].mean():.1f}")
+    with col3:
+        max_period = trend_data.loc[trend_data['count'].idxmax(), 'publication_date']
+        if time_granularity == "År":
+            max_period_str = str(int(max_period))
+        else:
+            max_period_str = pd.to_datetime(max_period).strftime('%Y-%m-%d')
+        st.metric("Mest aktiva period", max_period_str)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def show_sector_distribution(df):
+    """Shows distribution between public and private sector"""    
+    st.subheader("Sektorsfördelning")
+    
+    st.markdown('<div class="sector-chart-container">', unsafe_allow_html=True)
+    
     try:
-        # Check if we have enough data for a meaningful trend. 2 unique dates are needed.
-        unique_dates = df['publication_date'].nunique()
-        if unique_dates < 2:
-            st.warning(f"Inte tillräckligt med tidseriedata för trendanalys. Endast {unique_dates} unika datum hittades.")
+        if df.empty:
+            st.info("Ingen data tillgänglig för att visa sektorsfördelning")
             return
             
-        # Group by month.
-        df['month'] = df['publication_date'].dt.to_period('M')
-        trend_data = df.groupby('month').size().reset_index(name='count')
-        trend_data['month'] = trend_data['month'].dt.to_timestamp()
+        if 'employer_name' not in df.columns:
+            st.info("Arbetsgivar-data saknas i datasetet")
+            return
+            
+        # Kategorisera sektor baserat på arbetsgivare
+        def categorize_sector(employer):
+            if pd.isna(employer):
+                return 'Okänd'
+            employer_lower = str(employer).lower()
+            
+            # - Offentlig sektor
+            if any(word in employer_lower for word in ['kommun', 'region', 'landsting', 'statlig', 'myndighet', 'förvaltning', 'styrelsens']):
+                return 'Offentlig sektor'
+            # - Konsult/Bemanning
+            elif any(word in employer_lower for word in ['konsult', 'bemanning', 'rekrytering', 'consulting', 'interim']):
+                return 'Konsult/Bemanning'
+            # - Privat sektor (allt annat)
+            else:
+                return 'Privat sektor'       
+        # Applicera kategorisering
+        df_temp = df.copy()
+        df_temp['sector'] = df_temp['employer_name'].apply(categorize_sector)        
+        # Filtrera bort okända för tydligare analys
+        sector_df = df_temp[df_temp['sector'] != 'Okänd']
         
-        # Create trend line with Plotly Express
-        fig = px.line(
-            trend_data,
-            x='month',
-            y='count',
-            title='Chefsrekrytering över tid',
-            labels={'month': 'Månad', 'count': 'Antal annonser'}
+        if sector_df.empty:
+            st.info("Ingen giltig sektordata tillgänglig")
+            return
+            
+        sector_counts = sector_df['sector'].value_counts()       
+        # Röda toner för att matcha dashboard-temat
+        custom_reds = px.colors.sequential.Reds[2:7]
+        
+        fig = px.pie(
+            values=sector_counts.values,
+            names=sector_counts.index,
+            title="Sektorsfördelning av chefsroller",
+            color_discrete_sequence=custom_reds,
+            hole=0.4
         )
-        fig.update_xaxes(tickformat="%b %Y")
         
-        # Add points for easier reading
-        fig.update_traces(mode='lines+markers')
-        fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
+        fig.update_traces(
+            textposition="inside", 
+            textinfo="percent+label",
+            textfont_size=12
+        )
+        fig.update_layout(
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.01
+            ),
+            margin=dict(l=20, r=80, t=60, b=20)
+        )
         
-        st.plotly_chart(fig, use_container_width=True)
-        # Close the container
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.plotly_chart(fig, use_container_width=True)      
+        # Visa insikter
+        total_with_sector = len(sector_df)
+        total_jobs = len(df)
+        coverage = (total_with_sector / total_jobs) * 100       
+        # Coverage info
+        st.caption(f"{total_with_sector}/{total_jobs} jobb ({coverage:.1f}%) har sektordata")
         
     except Exception as e:
-        st.error(f"Fel vid visning av trenddiagram: {e}")
+        st.error("Kunde inte visa sektorsfördelning")
+        print(f"Sector chart error: {e}")
+        
+    finally:
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ======== DATA TABLE FUNCTIONS ========
@@ -339,58 +395,65 @@ def show_jobs_table(df):
         st.warning("Ingen data tillgänglig att visa i tabellen")
         return
         
-    st.subheader("Chefsannonser")
-    
+    st.subheader("Alla chefsannonser")   
     # Add container with class for CSS styling
-    st.markdown('<div class="table-container">', unsafe_allow_html=True)
+    st.markdown('<div class="jobs-table-container">', unsafe_allow_html=True)   
     
-    # Create copy of df for display
-    display_df = df.copy()
+    # Select available columns to display - Updated based on actual data structure
+    display_columns = ['publication_date', 'application_deadline', 'headline', 'occupation', 'employer_name', 'workplace_region']
     
-    # Format dates
-    if 'publication_date' in display_df.columns:
-        display_df['publication_date'] = pd.to_datetime(display_df['publication_date']).dt.strftime('%Y-%m-%d')
-    if 'application_deadline' in display_df.columns:
-        display_df['application_deadline'] = pd.to_datetime(display_df['application_deadline']).dt.strftime('%Y-%m-%d')
+    if 'is_open' in df.columns:
+        display_columns.append('is_open')
     
-    # Select columns to display
-    columns_to_display = ['occupation', 'employer_name', 'workplace_municipality', 'workplace_region', 
-                         'publication_date', 'application_deadline']
+    # Add application_url if available
+    if 'application_url' in df.columns:
+        display_columns.append('application_url')
     
-    # Add is_open if it exists
-    if 'is_open' in display_df.columns:
-        columns_to_display.append('is_open')
+    available_columns = [col for col in display_columns if col in df.columns]
     
-    # Only select columns that actually exist in the dataframe
-    columns_to_display = [col for col in columns_to_display if col in display_df.columns]
-    
-    if not columns_to_display:
-        st.warning("Inga giltiga kolumner tillgängliga att visa")
+    if not available_columns:
+        st.warning("Inga kolumner tillgängliga att visa")
         return
     
-    # Create a copy with only selected columns
-    display_df = display_df[columns_to_display].copy()
+    # Create display dataframe
+    display_df = df[available_columns].copy()   
     
-    # Make column names prettier for display
+    # Format dates - BOTH publication_date and application_deadline
+    for date_col in ['publication_date', 'application_deadline']:
+        if date_col in display_df.columns:
+            display_df[date_col] = pd.to_datetime(display_df[date_col]).dt.strftime('%Y-%m-%d')   
+    
+    # Create clickable application links if URL column exists
+    if 'application_url' in display_df.columns:
+        def create_link(url):
+            if pd.isna(url) or url == 'Ingen data' or url == '':
+                return '❌'
+            else:
+                return f'<a href="{url}" target="_blank">🔗 Ansök</a>'
+        
+        display_df['Ansök'] = display_df['application_url'].apply(create_link)
+        # Remove the raw URL column from display
+        display_df = display_df.drop('application_url', axis=1)
+    
+    # Correct column renaming based on actual data
     column_rename = {
+        'publication_date': 'Publiceringsdatum',
+        'headline': 'Rubrik',
         'occupation': 'Chefsroll',
         'employer_name': 'Arbetsgivare',
-        'workplace_municipality': 'Kommun',
         'workplace_region': 'Län',
-        'publication_date': 'Publiceringsdatum',
         'application_deadline': 'Sista ansökningsdag',
         'is_open': 'Öppen för ansökan'
     }
     
-    # Apply renaming but only for columns that exist
     rename_dict = {k: v for k, v in column_rename.items() if k in display_df.columns}
-    display_df = display_df.rename(columns=rename_dict)
+    display_df = display_df.rename(columns=rename_dict)   
     
-    # If is_open exists, convert to Yes/No
+    # Convert is_open to Yes/No
     if 'Öppen för ansökan' in display_df.columns:
-        display_df['Öppen för ansökan'] = display_df['Öppen för ansökan'].map({True: 'Ja', False: 'Nej'})
+        display_df['Öppen för ansökan'] = display_df['Öppen för ansökan'].map({True: 'Ja', False: 'Nej'}) 
     
-    # Display with pagination
+    # Pagination
     rows_per_page = 10
     total_rows = len(display_df)
     total_pages = max(1, (total_rows - 1) // rows_per_page + 1)
@@ -404,49 +467,86 @@ def show_jobs_table(df):
     
     with col1:
         st.markdown(f"Visar annonser **{start_idx + 1}–{end_idx}** av totalt **{total_rows}**")
+    # Display table - use HTML if we have clickable links, otherwise use dataframe
+    table_data = display_df.iloc[start_idx:end_idx]
     
-    st.dataframe(display_df.iloc[start_idx:end_idx], use_container_width=True)
+    if 'Ansök' in table_data.columns:
+        # Create HTML table with styling
+        html_table = table_data.to_html(
+            escape=False, 
+            index=False, 
+            classes='styled-table',
+            table_id='jobs-table'
+        )
+        st.markdown(html_table, unsafe_allow_html=True)
+    else:
+        # Fallback to regular dataframe
+        st.dataframe(table_data, use_container_width=True)
     
-    # Add download button
-    csv = display_df.to_csv(index=False).encode('utf-8')
+    #=== Download button ===
+    # For CSV, use original data without HTML formatting
+    csv_df = display_df.copy()
+    if 'Ansök' in csv_df.columns:
+        csv_df = csv_df.drop('Ansök', axis=1)  # Remove HTML column from CSV
+    
+    csv = csv_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="Ladda ner data som CSV",
         data=csv,
         file_name="chefsroller_data.csv",
         mime="text/csv",
-    )
+    )  
+    
     # Close the container
     st.markdown('</div>', unsafe_allow_html=True)
 
+
+# ======== RESET FILTERING FUNCTIONS ========
+def reset_filters():
+    """Reset all filter-related session state keys"""
+    filter_keys = [
+        'show_only_open',
+        'selected_regions',
+        'selected_cities',
+        'selected_occupations',
+        'selected_employers',
+        'selected_employment_types'
+    ]
+    # Remove all filter-related keys from session state
+    for key in filter_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    st.sidebar.success("Alla filter har återställts!")
 
 # ======== FILTERING FUNCTIONS ========
 def add_sidebar_filters(df):
     """Adds filters in the sidebar and returns filtered dataframe"""
     st.sidebar.header("Filtrera jobb")
     
+    # Add reset button at the top of the sidebar
+    if st.sidebar.button("Återställ alla filter", type="secondary", use_container_width=True):
+        reset_filters()
+        st.rerun()
+    
+    st.sidebar.markdown("---")  # Add a separator line
+    
     if df.empty:
         st.sidebar.warning("Ingen data tillgänglig för filtrering")
         return df
     
-    filtered_df = df.copy()
-    
+    filtered_df = df.copy()    
     # 1. Filter to show only open jobs
     if 'is_open' in df.columns:
-        show_only_open = st.sidebar.checkbox("Visa endast öppna jobb", value=False)
+        show_only_open = st.sidebar.checkbox(
+            "Visa endast jobb som går att söka", 
+            value=st.session_state.get('show_only_open', False),
+            key='show_only_open'
+        )
         if show_only_open:
             filtered_df = filtered_df[filtered_df['is_open']]
-    
-    # 2. Filter for leadership roles
-    if 'occupation' in df.columns and df['occupation'].nunique() > 0:
-        occupation_series = df['occupation'].dropna()
-        occupations = occupation_series[occupation_series != 'Ingen data'].unique()
-        occupations = sorted(occupations)
-        
-        selected_occupations = st.sidebar.multiselect('Filtrera på chefsroll', occupations)
-        if selected_occupations:  # <- Now properly indented
-            filtered_df = filtered_df[filtered_df['occupation'].isin(selected_occupations)]
-    
-    # 3. Filter for counties
+
+    # 2. Filter for counties
     if 'workplace_region' in df.columns and df['workplace_region'].nunique() > 0:
         # Remove null and "Ingen data" values from region options
         region_series = df['workplace_region'].dropna()
@@ -454,16 +554,46 @@ def add_sidebar_filters(df):
         # Sort regions alphabetically
         regions = sorted(regions)
     
-        selected_regions = st.sidebar.multiselect('Filtrera på län', regions)
+        selected_regions = st.sidebar.multiselect(
+            'Filtrera på län', 
+            regions,
+            default=st.session_state.get('selected_regions', []),
+            key='selected_regions'
+        )
         if selected_regions:
             filtered_df = filtered_df[filtered_df['workplace_region'].isin(selected_regions)]
+            
+    # 3. Filter for cities
+    if 'workplace_city' in df.columns and df['workplace_city'].nunique() > 0:
+        # Remove null and "Ingen data" values from city options
+        city_series = df['workplace_city'].dropna()
+        cities = city_series[city_series != 'Ingen data'].unique()
+        # Sort cities alphabetically
+        cities = sorted(cities)
+        
+        selected_cities = st.sidebar.multiselect(
+            'Filtrera på stad',
+            cities,
+            default=st.session_state.get('selected_cities', []),
+            key='selected_cities'
+        )
+        if selected_cities:
+            filtered_df = filtered_df[filtered_df['workplace_city'].isin(selected_cities)]
     
-    # 4. Filter for municipalities
-    if 'workplace_municipality' in df.columns and df['workplace_municipality'].nunique() > 0:
-        municipalities = df['workplace_municipality'].dropna().unique()
-        selected_municipalities = st.sidebar.multiselect('Filtrera på kommun', municipalities)
-        if selected_municipalities:
-            filtered_df = filtered_df[filtered_df['workplace_municipality'].isin(selected_municipalities)]
+    # 4. Filter for leadership roles
+    if 'occupation' in df.columns and df['occupation'].nunique() > 0:
+        occupation_series = df['occupation'].dropna()
+        occupations = occupation_series[occupation_series != 'Ingen data'].unique()
+        occupations = sorted(occupations)
+        
+        selected_occupations = st.sidebar.multiselect(
+            'Filtrera på chefsroll', 
+            occupations,
+            default=st.session_state.get('selected_occupations', []),
+            key='selected_occupations'
+        )
+        if selected_occupations:
+            filtered_df = filtered_df[filtered_df['occupation'].isin(selected_occupations)]
     
     # 5. Filter for employers
     if 'employer_name' in df.columns and df['employer_name'].nunique() > 0:
@@ -473,26 +603,47 @@ def add_sidebar_filters(df):
         # Sort employers alphabetically
         employers = sorted(employers)
         
-        selected_employers = st.sidebar.multiselect('Filtrera på arbetsgivare', employers)
+        selected_employers = st.sidebar.multiselect(
+            'Filtrera på arbetsgivare', 
+            employers,
+            default=st.session_state.get('selected_employers', []),
+            key='selected_employers'
+        )
         if selected_employers:
             filtered_df = filtered_df[filtered_df['employer_name'].isin(selected_employers)]
+            
+    # 6. Filter for employment type
+    if 'employment_type' in df.columns and df['employment_type'].notna().any():
+        employment_types = df['employment_type'].dropna()
+        employment_types = employment_types[employment_types != 'Ingen data'].unique()
+        employment_types = sorted(employment_types)
+        
+        if employment_types:
+            selected_employment_types = st.sidebar.multiselect(
+                'Filtrera på anställningstyp',
+                employment_types,
+                default=st.session_state.get('selected_employment_types', []),
+                key='selected_employment_types'
+            )
+            
+            if selected_employment_types:
+                filtered_df = filtered_df[filtered_df['employment_type'].isin(selected_employment_types)]
     
     # Show count after filtering
     if len(filtered_df) < len(df):
         st.sidebar.markdown(f"**{len(filtered_df)}** jobb matchar filtren")
     
     return filtered_df
-
-
+    
+    
 # ======== MAIN APPLICATION ========
 def main():
     st.title("Chefer och verksamhetsledare")
     
     st.markdown("""
-    ### HR-analys för talangakvistionsspecialister
+    ### Marknadsinsikter för Chefsrekrytering
     
-    Detta dashboard hjälper rekryteringsspecialister att analysera jobbannonser för chefer och verksamhetsledare, 
-    för att identifiera trender och behov på arbetsmarknaden.
+    Detta verktyg ger dig insikter i chefsmarknaden genom analys av jobbannonser, geografiska mönster och rekryteringstrender.
     """)
     
     try:
@@ -502,13 +653,12 @@ def main():
         if df.empty:
             st.error("Kunde inte ladda data för chefer och verksamhetsledare. Databasen kan vara tom eller ha anslutningsproblem.")
             return
-            
         # Add filters in sidebar
         filtered_df = add_sidebar_filters(df)
         
         # ======== KEY METRICS SECTION ========
         show_leadership_metrics(df, filtered_df)
-        
+               
         # ======== VISUALIZATION TABS ========
         # Add tabs for visualizations
         st.markdown('<div class="visualizations-section">', unsafe_allow_html=True)
@@ -522,8 +672,11 @@ def main():
             with col2:
                 show_region_chart(filtered_df)
             
-            # Display municipality map
-            show_municipality_chart(filtered_df)
+            col1, col2 = st.columns(2)
+            with col1:
+                show_municipality_chart(filtered_df)
+            with col2:
+                show_sector_distribution(filtered_df) 
         
         with tab2:
             # Display trend chart for the entire dataset (or filtered if we want)
