@@ -188,3 +188,44 @@ dbt_modules/
 
 # dbt logs
 logs/
+
+# ========== STREAMLIT SPECIFIC ==========
+# Streamlit secrets and config
+.streamlit/
+.streamlit/secrets.toml
+
+# ========== LLM/AI SPECIFIC ==========
+# AI model cache and responses
+cache/
+**/cache/
+*.cache
+
+# LLM API responses and analysis results
+api_responses/
+analysis_results/
+gemini_responses/
+llm_output/
+
+# AI model files (if downloading models locally)
+models/
+*.model
+*.bin
+*.gguf
+*.safetensors
+
+# Large AI datasets
+datasets/
+data/raw/
+*.parquet
+*.feather
+
+# AI experiment tracking
+wandb/
+mlruns/
+.neptune/
+
+# ========== DAGSTER ==========
+# Dagster instance and storage
+.dagster/
+dagster_home/
+storage/
