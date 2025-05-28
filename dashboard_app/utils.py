@@ -33,7 +33,7 @@ def load_data(mart_table):
 
     try:
         with DataBase_Connection() as conn:
-            df = conn.execute("SELECT * FROM mart.mart_occupation_social").fetchdf()
+            df = conn.execute(f"SELECT * FROM {mart_table}").fetchdf()
             df["publication_date"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.date
             df["application_deadline"] = pd.to_datetime(df["application_deadline"], errors="coerce").dt.date
             df = df[df["application_deadline"] >= now]
@@ -44,6 +44,23 @@ def load_data(mart_table):
     except Exception as e:
         st.error(f"Fel vid inläsning av data från {mart_table}: {e}")
         return pd.DataFrame()
+
+# Function to fetch the most recent ingestion timestamp from the staging.job_ads table
+# Connects to the DuckDB database in read-only mode, and returns the latest ingestion time
+def get_latest_ingestion():
+    db_path = Path(__file__).parent.parent / "jobads_data_warehouse.duckdb"
+    try:
+        with duckdb.connect(database=db_path, read_only=True) as conn:
+            result = conn.execute("""
+                    SELECT MAX(ingestion_timestamp) as last_updates
+                    FROM staging.job_ads
+                    """).fetchone()
+            return result[0] if result else None
+            
+    except Exception as e:
+        print(f"Fel vid hämtning av data: {e}")
+        return None
+
 
 
 # ========== LLM FUNKTIONALITET ==========
