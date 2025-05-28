@@ -23,5 +23,6 @@ daily_schedule = ScheduleDefinition(
 defs = Definitions(
     assets=all_assets,
     jobs=[pipeline_job],
+    schedules=[daily_schedule],
 )
 

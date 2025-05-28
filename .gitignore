@@ -188,3 +188,6 @@ dbt_modules/
 
 # dbt logs
 logs/
+
+#tmp dagster
+**/.tmp_dagster_home_*/
