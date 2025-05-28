@@ -24,11 +24,10 @@ def load_leadership_data():
             # print("Available tables:", available_tables)
             df = conn.execute("SELECT * FROM mart.mart_leadership_jobs").fetchdf()                    
         # Convert date columns if they exist
-        for date_col in ['application_deadline', 'publication_date']:
-            if date_col in df.columns:
-                df[date_col] = pd.to_datetime(df[date_col])
-                if df[date_col].dt.tz is not None:
-                    df[date_col] = df[date_col].dt.tz_localize(None)
+        date_cols = ['application_deadline', 'publication_date']
+        for col in date_cols:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col]).dt.tz_localize(None)
         # Add flag for open jobs
         if 'application_deadline' in df.columns:
             df['is_open'] = df['application_deadline'] >= pd.Timestamp.now()
@@ -86,7 +85,7 @@ def show_role_chart(df):
         st.warning("Rolldiagram kan inte visas: yrkesdata saknas")
         return
     
-    st.subheader("Topp 10 chefsroller nationellt")    
+    st.subheader("Topp 10 chefsroller")    
     # Container with border and class for CSS styling
     with st.container():
         st.markdown('<div class="role-chart-container">', unsafe_allow_html=True)
@@ -122,7 +121,7 @@ def show_region_chart(df):
         st.warning("Länsdiagram kan inte visas: länsdata saknas")
         return
         
-    st.subheader("Topp 10 län med flest annonser")
+    st.subheader("Topp 10 län")
     # Container with border and class for CSS styling
     with st.container():
         st.markdown('<div class="region-chart-container">', unsafe_allow_html=True)
@@ -151,7 +150,7 @@ def show_region_chart(df):
 # ======== CHART VISUALIZATION FUNCTIONS ========
 def show_municipality_chart(df):
     """Displays chart for municipalities with the most leadership job listings"""
-    st.subheader("Topp 10 kommuner med flest annonser")
+    st.subheader("Topp 10 kommuner")
     # Add container with class for CSS styling
     st.markdown('<div class="municipality-chart-container">', unsafe_allow_html=True)
     
@@ -205,27 +204,23 @@ def show_trend_chart(df):
         
     st.subheader("Trend för chefsrekryteringar")
     
-    st.markdown('<div class="trend-chart-container">', unsafe_allow_html=True)
-    
+    st.markdown('<div class="trend-chart-container">', unsafe_allow_html=True)  
     # Create copy and convert dates first
     df_copy = df.copy()
-    df_copy['publication_date'] = pd.to_datetime(df_copy['publication_date'])
-    
+    df_copy['publication_date'] = pd.to_datetime(df_copy['publication_date'])    
     # Filter data to only include years 2020-2025
     df_copy = df_copy[(df_copy['publication_date'].dt.year >= 2020) & 
                       (df_copy['publication_date'].dt.year <= 2025)]
     
     if df_copy.empty:
         st.warning("Ingen data tillgänglig för åren 2020-2025")
-        return
-    
+        return   
     # Let user choose time granularity
     time_granularity = st.selectbox(
         "Välj tidsintervall:", 
         ["Dag", "Vecka", "Månad", "År"], 
         index=2  # Default to "Månad"
     )
-    
     # Group by selected time period
     if time_granularity == "Dag":
         # Group by actual date
@@ -522,31 +517,16 @@ def reset_filters():
 # ======== FILTERING FUNCTIONS ========
 def add_sidebar_filters(df):
     """Adds filters in the sidebar and returns filtered dataframe"""
-    st.sidebar.header("Filtrera jobb")
-    
-    # Add reset button at the top of the sidebar
-    if st.sidebar.button("Återställ alla filter", type="secondary", use_container_width=True):
-        reset_filters()
-        st.rerun()
-    
-    st.sidebar.markdown("---")  # Add a separator line
+        
+    st.sidebar.header("Filtrera jobbannonser")
     
     if df.empty:
         st.sidebar.warning("Ingen data tillgänglig för filtrering")
         return df
     
     filtered_df = df.copy()    
-    # 1. Filter to show only open jobs
-    if 'is_open' in df.columns:
-        show_only_open = st.sidebar.checkbox(
-            "Visa endast jobb som går att söka", 
-            value=st.session_state.get('show_only_open', False),
-            key='show_only_open'
-        )
-        if show_only_open:
-            filtered_df = filtered_df[filtered_df['is_open']]
-
-    # 2. Filter for counties
+    
+    # 1. Filter for counties
     if 'workplace_region' in df.columns and df['workplace_region'].nunique() > 0:
         # Remove null and "Ingen data" values from region options
         region_series = df['workplace_region'].dropna()
@@ -558,29 +538,34 @@ def add_sidebar_filters(df):
             'Filtrera på län', 
             regions,
             default=st.session_state.get('selected_regions', []),
-            key='selected_regions'
+            key='selected_regions',
+            placeholder="Välj län"
         )
         if selected_regions:
             filtered_df = filtered_df[filtered_df['workplace_region'].isin(selected_regions)]
             
-    # 3. Filter for cities
+    # 2. Filter for cities
     if 'workplace_city' in df.columns and df['workplace_city'].nunique() > 0:
         # Remove null and "Ingen data" values from city options
         city_series = df['workplace_city'].dropna()
         cities = city_series[city_series != 'Ingen data'].unique()
-        # Sort cities alphabetically
-        cities = sorted(cities)
-        
+        # Format cities with proper capitalization and sort
+        cities_formatted = [city.title() for city in cities]
+        cities_formatted = sorted(cities_formatted)
+    
         selected_cities = st.sidebar.multiselect(
             'Filtrera på stad',
-            cities,
+            cities_formatted,
             default=st.session_state.get('selected_cities', []),
-            key='selected_cities'
+            key='selected_cities',
+            placeholder="Välj stad"
         )
         if selected_cities:
-            filtered_df = filtered_df[filtered_df['workplace_city'].isin(selected_cities)]
+            # Convert back to original format for filtering
+            original_cities = [city for city in cities if city.title() in selected_cities]
+            filtered_df = filtered_df[filtered_df['workplace_city'].isin(original_cities)]
     
-    # 4. Filter for leadership roles
+    # 3. Filter for leadership roles
     if 'occupation' in df.columns and df['occupation'].nunique() > 0:
         occupation_series = df['occupation'].dropna()
         occupations = occupation_series[occupation_series != 'Ingen data'].unique()
@@ -590,12 +575,13 @@ def add_sidebar_filters(df):
             'Filtrera på chefsroll', 
             occupations,
             default=st.session_state.get('selected_occupations', []),
-            key='selected_occupations'
+            key='selected_occupations',
+            placeholder="Välj chefsroll"
         )
         if selected_occupations:
             filtered_df = filtered_df[filtered_df['occupation'].isin(selected_occupations)]
     
-    # 5. Filter for employers
+    # 4. Filter for employers
     if 'employer_name' in df.columns and df['employer_name'].nunique() > 0:
         # Remove null and "Ingen data" values from employer options
         employer_series = df['employer_name'].dropna()
@@ -607,12 +593,13 @@ def add_sidebar_filters(df):
             'Filtrera på arbetsgivare', 
             employers,
             default=st.session_state.get('selected_employers', []),
-            key='selected_employers'
+            key='selected_employers',
+            placeholder="Välj arbetsgivare"
         )
         if selected_employers:
             filtered_df = filtered_df[filtered_df['employer_name'].isin(selected_employers)]
             
-    # 6. Filter for employment type
+    # 5. Filter for employment type
     if 'employment_type' in df.columns and df['employment_type'].notna().any():
         employment_types = df['employment_type'].dropna()
         employment_types = employment_types[employment_types != 'Ingen data'].unique()
@@ -623,25 +610,44 @@ def add_sidebar_filters(df):
                 'Filtrera på anställningstyp',
                 employment_types,
                 default=st.session_state.get('selected_employment_types', []),
-                key='selected_employment_types'
+                key='selected_employment_types',
+                placeholder="Välj anställningstyp"
             )
             
             if selected_employment_types:
                 filtered_df = filtered_df[filtered_df['employment_type'].isin(selected_employment_types)]
     
+    # 6. Filter to show only open jobs - MOVED TO BOTTOM
+    if 'is_open' in df.columns:
+        st.sidebar.markdown("---")  # Add a separator line before the checkbox
+        show_only_open = st.sidebar.checkbox(
+            "Visa endast öppna annonser", 
+            value=st.session_state.get('show_only_open', False),
+            key='show_only_open'
+        )
+        if show_only_open:
+            filtered_df = filtered_df[filtered_df['is_open']]
+
     # Show count after filtering
     if len(filtered_df) < len(df):
-        st.sidebar.markdown(f"**{len(filtered_df)}** jobb matchar filtren")
+        st.sidebar.markdown(f"**{len(filtered_df)}** jobb matchar filtret")
+        
+    st.sidebar.markdown("---")  # Add a separator line
+                
+    # Add reset button at the bottom
+    if st.sidebar.button("Återställ alla filter", type="secondary", use_container_width=True):
+        reset_filters()
+        st.rerun()
     
     return filtered_df
-    
-    
+
+
 # ======== MAIN APPLICATION ========
 def main():
     st.title("Chefer och verksamhetsledare")
     
     st.markdown("""
-    ### Marknadsinsikter för Chefsrekrytering
+    ### Marknadsinsikter för chefsrekrytering
     
     Detta verktyg ger dig insikter i chefsmarknaden genom analys av jobbannonser, geografiska mönster och rekryteringstrender.
     """)
@@ -661,31 +667,73 @@ def main():
                
         # ======== VISUALIZATION TABS ========
         # Add tabs for visualizations
+
         st.markdown('<div class="visualizations-section">', unsafe_allow_html=True)
-        tab1, tab2 = st.tabs(["Chefsroller och geografi", "Trendanalys"])
+        
+        # Check if filters are active
+        has_active_filters = len(filtered_df) < len(df)
+        
+        # Create tabs - add third tab only if filters are active
+        if has_active_filters:
+            tab1, tab2, tab3 = st.tabs([
+                "Chefsroller och geografi", 
+                "Trendanalys", 
+                "Filterresultat"
+            ])
+        else:
+            tab1, tab2 = st.tabs([
+                "Chefsroller och geografi", 
+                "Trendanalys"
+            ])
         
         with tab1:
-            # Display visualizations in two columns
+            st.markdown("### Nationell översikt")
+            # Display visualizations in two columns using original data
             col1, col2 = st.columns(2)
             with col1:
-                show_role_chart(filtered_df)
+                show_role_chart(df)
             with col2:
-                show_region_chart(filtered_df)
+                show_region_chart(df)
             
             col1, col2 = st.columns(2)
             with col1:
-                show_municipality_chart(filtered_df)
+                show_municipality_chart(df)
             with col2:
-                show_sector_distribution(filtered_df) 
+                show_sector_distribution(df) 
         
         with tab2:
-            # Display trend chart for the entire dataset (or filtered if we want)
-            show_trend_chart(filtered_df)
-        # Close the visualizations section
+            st.markdown("### Trendanalys över tid")
+            # Display trend chart for the entire dataset
+            show_trend_chart(df)
+        
+        # Third tab only shown when filters are active
+        if has_active_filters:
+            with tab3:
+                st.markdown("### Filtrerade resultat")
+                
+                # Show filter summary
+                filter_info = []
+                if 'selected_regions' in st.session_state and st.session_state.selected_regions:
+                    filter_info.append(f"**Län:** {', '.join(st.session_state.selected_regions)}")
+                if 'selected_cities' in st.session_state and st.session_state.selected_cities:
+                    filter_info.append(f"**Städer:** {', '.join(st.session_state.selected_cities)}")
+                if 'selected_occupations' in st.session_state and st.session_state.selected_occupations:
+                    filter_info.append(f"**Chefsroller:** {', '.join(st.session_state.selected_occupations[:3])}{'...' if len(st.session_state.selected_occupations) > 3 else ''}")
+                if 'selected_employers' in st.session_state and st.session_state.selected_employers:
+                    filter_info.append(f"**Arbetsgivare:** {', '.join(st.session_state.selected_employers[:2])}{'...' if len(st.session_state.selected_employers) > 2 else ''}")
+                if 'show_only_open' in st.session_state and st.session_state.show_only_open:
+                    filter_info.append("**Endast öppna annonser**")
+                
+                if filter_info:
+                    st.info("**Aktiva filter:** " + " | ".join(filter_info))               
+                # Show filtered table (only the table, no charts)
+                show_jobs_table(filtered_df)        
+        # Close the css section
         st.markdown('</div>', unsafe_allow_html=True) 
         
         # ======== DATA TABLE SECTION ========
-        show_jobs_table(filtered_df)
+        if not has_active_filters:
+            show_jobs_table(df)
             
     except Exception as e:
         st.error(f"Ett fel uppstod när applikationen kördes: {e}")
