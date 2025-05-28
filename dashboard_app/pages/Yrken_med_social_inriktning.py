@@ -17,9 +17,8 @@ logging.basicConfig(
 
 now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
 
-#st.success("Annonserna hämtas från Arbetsförmedlingen och uppdateras varje natt.") #If I manage to use a dagster pipeline
 
-   
+
 # ======= ERROR HANDLING ========
 def check_if_dataframe_empty(df, messsage):
     if df.empty:
@@ -37,6 +36,7 @@ def reset_sidebar_filters():
     st.session_state["driving_license_required"] = False
     st.session_state["own_car_required"] = False
     st.session_state["experience_required"] = False
+    st.session_state["expiring_ads"] = False
     st.rerun()
 
 # ======== DISPLAY SIDEBAR FUNCTION ========
@@ -86,13 +86,18 @@ def display_sidebar(df):
         ["Alla"] + sorted(employment_type.tolist()),
         key="employment_type"
     )
-
+   
     # Add checkboxes for aux-attributes
     require_driving_license = st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
     require_own_car = st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
     require_experience = st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
 
-  
+    # Add checkbox to show ads which expires within 3 days
+    show_expiring_ads = st.sidebar.checkbox(
+        "Visa annonser som löper ut inom tre dagar",
+        value=False,
+        key="expiring_ads"
+    )   
 
     filters = {
         "occupation_group": selected_occupation_group,
@@ -101,7 +106,8 @@ def display_sidebar(df):
         "employment_type": selected_employment_type,
         "driving_license_required": require_driving_license,
         "own_car_required": require_own_car,
-        "experience_required": require_experience
+        "experience_required": require_experience,
+        "expiring_ads": show_expiring_ads
     }
     return filters
      
@@ -122,7 +128,13 @@ def apply_sidebar_filters(df, filters):
         filtered_df = filtered_df[filtered_df["own_car_required"] == True]
     if filters["experience_required"]:
         filtered_df = filtered_df[filtered_df["experience_required"] == True]
-
+    if filters.get("expiring_ads", False):
+        today = date.today()
+        deadline_limit = today + timedelta(days=3)
+        filtered_df = filtered_df[
+            (pd.to_datetime(filtered_df["application_deadline"]).dt.date >= today) &
+            (pd.to_datetime(filtered_df["application_deadline"]).dt.date <= deadline_limit)
+        ]       
     return filtered_df
 
 # ======= DISPLAY DATAFRAME FUNCTION ========
@@ -168,14 +180,14 @@ def show_metric_data(df):
                 latest = weekly_counts.iloc[-1]
                 previous = weekly_counts.iloc[-2]
                 st.metric(
-                    label=f"Annonser vecka {int(latest['week'])}",
+                    label=f"Antal nytillkomna annonser vecka {int(latest['week'])}",
                     value=int(latest['count']),
                     delta=int(latest['count']) - int(previous['count'])
                 )
         elif len(weekly_counts) == 1:
             latest = weekly_counts.iloc[-1]
             st.metric(
-                label=f"Annonser vecka {int(latest['week'])}",
+                label=f"Antal nytillkomna annonser vecka {int(latest['week'])}",
                 value=int(latest['count']),
                 delta="Ingen föregående vecka"
             )
@@ -183,8 +195,10 @@ def show_metric_data(df):
             st.metric("Annonser per vecka", "Inga data")
     
     with column2:
-        st.metric("Antal unika yrken", df['occupation'].nunique()) 
+        st.metric("Antal unika yrken", df['occupation'].nunique())
     
+
+       
     with column3:
         st.metric("Antal unika arbetsgivare", df['employer_name'].nunique())
     
@@ -207,7 +221,7 @@ def show_metric_data(df):
             st.plotly_chart(fig, use_container_width=True)       
     
     with column5:
-        st.metric("Det mest eftersökta yrket", df['occupation'].value_counts().idxmax())
+        st.metric("Det mest eftersökta yrket just nu", df['occupation'].value_counts().idxmax())
         with st.popover("Visa topp 5 yrken"):
             st.markdown("Topp 5 yrken")
             
@@ -311,13 +325,11 @@ def pagination(df):
 
 # ======== MAIN FUNCTION ========
 
-def main():
-    
+def main():      
+
     st.set_page_config(page_title="HR Analytics Dashboard", layout="wide")
-    st.title("Yrkesområden med social inriktning")
-    st.progress(0.1)  # Show a progress bar while loading data
-    st.markdown("---")
-    
+    st.title("Yrken med social inriktning")    
+    st.markdown("---")   
   
 
     # Load the data
@@ -328,32 +340,41 @@ def main():
     if check_if_dataframe_empty(df, "Inga efter inläsning från databasen."):       
         return
     if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
-        return
+        return  
     
-    display_df = create_display_df(filtered_df)
 
-
-    show_metric_data(filtered_df)
-    st.markdown("---")
-
-    column1, column2 = st.columns(2)
-   
-    with column1:
-        employment_type_distribution(filtered_df)
+    if filters.get("expiring_ads", False):
+        st.subheader("Annonser som löper ut inom 3 dagar")
+        
+        st.markdown("Endast annonser som snart stänger visas nedan. Övriga analyser är inaktiverade.")
+        st.markdown("Klicka på 'Rensa filter' i sidomenyn för att återgå till översikten.")
+        display_df = create_display_df(filtered_df)
+        current_page_df = pagination(display_df)
+        st.dataframe(current_page_df, use_container_width=True)
     
-    with column2:
-        ads_per_week(filtered_df)
-  
-    # Display the data - without the HTML table    
-    current_page_df = pagination(display_df)
-    st.dataframe(current_page_df, use_container_width=True)
-   
-   
-    # # Display the pagination - with the HTML table
-    # current_page_df = pagination(display_df)
-    # st.markdown(current_page_df.to_html(escape=False, index=False), unsafe_allow_html=True)
- 
+    else:
+        show_metric_data(filtered_df)
+        st.markdown("---")
+
+        column1, column2 = st.columns(2)
+    
+        with column1:
+            employment_type_distribution(filtered_df)
+        
+        with column2:
+            ads_per_week(filtered_df)
+    
+        # Display the data - without the HTML table
+        display_df = create_display_df(filtered_df)    
+        current_page_df = pagination(display_df)
+        st.dataframe(current_page_df, use_container_width=True)
+    
+    
+        # # Display the pagination - with the HTML table
+        # current_page_df = pagination(display_df)
+        # st.markdown(current_page_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+    
 
 if __name__ == "__main__":
     main()
-   
+    

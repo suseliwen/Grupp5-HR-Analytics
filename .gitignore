@@ -189,6 +189,16 @@ dbt_modules/
 # dbt logs
 logs/
 
+# zip-files
+*.zip
+
+# ========== DAGSTER ==========
+# Dagster instance and tmp storage
+.dagster/
+dagster_home/
+storage/
+**/.tmp_dagster_home_*/
+
 # ========== STREAMLIT SPECIFIC ==========
 # Streamlit secrets and config
 .streamlit/
@@ -224,8 +234,3 @@ wandb/
 mlruns/
 .neptune/
 
-# ========== DAGSTER ==========
-# Dagster instance and storage
-.dagster/
-dagster_home/
-storage/
