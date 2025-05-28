@@ -3,14 +3,13 @@
 This script loads data (job ads) from the JobTech API into a DLT pipeline, and saves the ads into a DuckDB database.
 It handles API-pagination, filters results by specified occupation fields, and organizes the data under a staging dataset.
 """
-
-
 import dlt
 import requests
 import json
 from pathlib import Path
 import os
 import duckdb
+from datetime import datetime
 
 # Function to fetch distinct IDs from the DuckDB database.
 # This is used to avoid duplicate entries when loading data.
@@ -56,6 +55,7 @@ def jobsearch_resource(params, existing_ids):
         for ad in hits:
             ad_id = ad.get("id")
             if ad_id and ad_id not in existing_ids:
+                ad["ingestion_timestamp"] = datetime.now().isoformat() #To enable viualization of the latest data ingestion in the Streamlit app
                 yield ad
 
         # If fewer ads than the limit are returned, or if the offset exceeds 1900, stop fetching.
