@@ -18,7 +18,9 @@ def reset_sidebar_filters():
 
 # ======== SIDEBAR FUNCTION =========
 def show_sidebar(df):
-    
+    if st.sidebar.button("Rensa urval"):
+        reset_sidebar_filters()
+
     st.sidebar.header("Filtrera ditt urval")
     st.sidebar.markdown("---")
 
@@ -62,15 +64,14 @@ def show_sidebar(df):
         "Välj anställningsform:", 
         ["Alla"] + sorted(employment_type.tolist())
     )
-    
+    st.sidebar.markdown("---")    
+
     # Checkboxes for aux-attributes
     st.sidebar.markdown("**Övriga krav**")
     driving_license = st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")    
     own_car = st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")    
     experience = st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
-
-    if st.sidebar.button("Rensa filter"):
-        reset_sidebar_filters()  
+   
 
     # Return as a dict
     return {
