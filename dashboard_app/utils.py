@@ -135,5 +135,20 @@ def validate_gemini_response(response_text):
             'arbetstyp': 'Unknown', 'område': 'Unknown'
         }        
         return {**defaults, **parsed}
-    except:
+    except Exception as e:
+        st.warning(f"Response validation error: {str(e)}")
         return None
+
+# ======= PROMPT FOR SOCIAL OCCUPATION =======
+
+def gemini_chat(prompt: str) -> str:
+    model = setup_gemini()
+    if model is None:
+        return "Fel när funktionen skulle aktiveras"
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Något gick tyvärr fel: {str(e)}"
+

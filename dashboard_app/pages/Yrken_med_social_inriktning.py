@@ -1,8 +1,12 @@
 import streamlit as st
 from utils import load_data
+from utils import get_latest_ingestion
+from utils import gemini_chat
+import google.generativeai as genai
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
+import seaborn as sns
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo #Necessary for timezone conversion
 import logging
@@ -16,8 +20,6 @@ logging.basicConfig(
 # ======= PAGE SETUP ========
 
 now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
-
-
 
 # ======= ERROR HANDLING ========
 def check_if_dataframe_empty(df, messsage):
@@ -41,11 +43,22 @@ def reset_sidebar_filters():
 
 # ======== DISPLAY SIDEBAR FUNCTION ========
 def display_sidebar(df):
-    st.sidebar.header("Filtrera ditt urval")    
 
     if st.sidebar.button("Rensa filter", key="reset_filters"):
         reset_sidebar_filters()
     
+    spacer = st.sidebar.empty()
+    spacer.markdown("<hr style='margin: 0.1rem 0;'>", unsafe_allow_html=True)
+
+    # Add toggle to show ads which expires within 3 days
+    show_expiring_ads = st.sidebar.toggle(
+        "### Se annonser som löper ut inom fem dagar",
+        value=False,
+        key="expiring_ads"
+    )      
+     
+    st.sidebar.header("Filtrera ditt urval")      
+       
     # Add a selectbox for job occupation_group selection
     occupation_group = df['occupation_group'].dropna().unique()
     selected_occupation_group = st.sidebar.selectbox(
@@ -90,14 +103,9 @@ def display_sidebar(df):
     # Add checkboxes for aux-attributes
     require_driving_license = st.sidebar.checkbox("Körkort krävs", value=False, key="driving_license_required")
     require_own_car = st.sidebar.checkbox("Egen bil krävs", value=False, key="own_car_required")
-    require_experience = st.sidebar.checkbox("Erfarenhet krävs", value=False, key="experience_required")
+    require_experience = st.sidebar.checkbox("Ingen erfarenhet krävs", value=False, key="experience_required")
 
-    # Add checkbox to show ads which expires within 3 days
-    show_expiring_ads = st.sidebar.checkbox(
-        "Visa annonser som löper ut inom tre dagar",
-        value=False,
-        key="expiring_ads"
-    )   
+  
 
     filters = {
         "occupation_group": selected_occupation_group,
@@ -127,10 +135,10 @@ def apply_sidebar_filters(df, filters):
     if filters["own_car_required"]:
         filtered_df = filtered_df[filtered_df["own_car_required"] == True]
     if filters["experience_required"]:
-        filtered_df = filtered_df[filtered_df["experience_required"] == True]
+        filtered_df = filtered_df[filtered_df["experience_required"] == False]
     if filters.get("expiring_ads", False):
         today = date.today()
-        deadline_limit = today + timedelta(days=3)
+        deadline_limit = today + timedelta(days=5)
         filtered_df = filtered_df[
             (pd.to_datetime(filtered_df["application_deadline"]).dt.date >= today) &
             (pd.to_datetime(filtered_df["application_deadline"]).dt.date <= deadline_limit)
@@ -169,41 +177,44 @@ def show_metric_data(df):
     column4, column5, column6 = st.columns(3)
 
     with column1:
+        latest = get_latest_ingestion()
+        if latest:
+            st.metric("Data senast inläst", latest.strftime("%Y-%m-%d"))
+        else:
+            st.warning("Kunde inte läsa uppdateringsdatum.")
+
+    with column2:
         df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
         weekly_counts = (
             df.groupby("week")
             .size()
             .reset_index(name="count")
             .sort_values("week")
-        )    
+        )  
         if len(weekly_counts) >= 2:
-                latest = weekly_counts.iloc[-1]
-                previous = weekly_counts.iloc[-2]
-                st.metric(
-                    label=f"Antal nytillkomna annonser vecka {int(latest['week'])}",
-                    value=int(latest['count']),
-                    delta=int(latest['count']) - int(previous['count'])
-                )
+            latest = weekly_counts.iloc[-1]
+            previous = weekly_counts.iloc[-2]
+            st.metric(
+                label=f"Nytillkomna annonser vecka {int(latest['week'])}",
+                value=int(latest['count']),
+                delta=int(latest['count']) - int(previous['count'])
+            )
         elif len(weekly_counts) == 1:
             latest = weekly_counts.iloc[-1]
             st.metric(
-                label=f"Antal nytillkomna annonser vecka {int(latest['week'])}",
+                label=f"Nytillkomna annonser vecka {int(latest['week'])}",
                 value=int(latest['count']),
                 delta="Ingen föregående vecka"
             )
         else:
-            st.metric("Annonser per vecka", "Inga data")
-    
-    with column2:
-        st.metric("Antal unika yrken", df['occupation'].nunique())
-    
+            st.metric("Nytillkomna annonser", "Inga data")
+   
 
-       
     with column3:
         st.metric("Antal unika arbetsgivare", df['employer_name'].nunique())
     
     with column4:
-        st.metric("Antal annonser", df.shape[0])
+        st.metric("Antal aktiva annonser", df.shape[0])
         with st.popover("Visa antal annonser per vecka"):
             st.markdown("Antal annonser de senaste veckorna")
             
@@ -259,12 +270,8 @@ def employment_type_distribution(df):
     if df.empty or df["employment_type"].dropna().empty:
         st.info("Inga annonser matchar dina val.")
         return
-    st.markdown("#### Fördelning av annonser utifrån anställningstyp")
-
     employment_type_counts = df["employment_type"].value_counts()
-
-    # Colors for the charts
-    custom_greens = px.colors.sequential.Greens[2:5]  # ['#00441b', '#006d2c', '#238b45', "#41ae76", "#66c2a4", "#99d8c9"]  
+ 
 
     fig = px.pie(
             employment_type_counts,
@@ -279,32 +286,135 @@ def employment_type_distribution(df):
     fig.update_layout(showlegend=True)
     st.plotly_chart(fig, use_container_width=True)
 
-def ads_per_week(df):
-    if df.empty or df["publication_date"].dropna().empty:
-        st.info("Inga annonser matchar dina val.")
-        return
-    st.markdown("#### Antal annonser publicerade per vecka")
+def aux_attributes(df):
+    num_driver_license = df["driving_license_required"].sum()
+    num_own_car = df["own_car_required"].sum()
+    num_experience = df["experience_required"].sum()
+    total = len(df)
 
-    df["week"] = df["publication_date"].apply(lambda d: d.isocalendar().week if pd.notnull(d) else None)
+    aux_data = pd.DataFrame({
+        "Krav": ['Körkort', 'Egen bil', 'Erfarenhet'],
+        "Antal": [num_driver_license, num_own_car, num_experience], 
+        "Andel (%)": [
+            f"{100 * num_driver_license / total:.1f}%",
+            f"{100 * num_own_car / total:.1f}%",
+            f"{100 * num_experience / total:.1f}%"
+        ]
+    })
+    aux_data = aux_data.sort_values("Antal", ascending=True)
 
-
-    weekly_counts = (
-        df.groupby("week")
-        .size()
-        .reset_index(name="count")
-        .sort_values(by="week")
-    )
     fig = px.bar(
-        weekly_counts,
-        x="week",
-        y="count",
-        title="Antal annonser publicerade per vecka",
-        labels={"week": "Vecka", "count": "Antal annonser"},
-        color_continuous_scale=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
-        color="count",
-        color_discrete_sequence=px.colors.qualitative.Plotly,
-    )                               
+        aux_data, 
+        x="Antal", 
+        y="Krav", 
+        orientation='h', 
+        text="Andel (%)", 
+        title="Vanligaste kraven i annonser",
+        color="Antal",
+        color_continuous_scale=["#00441b", "#238b45", "#66c2a4"],
+    )
+    
+    fig.update_layout(xaxis_title="Antal annonser", yaxis_title="Krav")
     st.plotly_chart(fig, use_container_width=True)
+
+# ======= EXPIRING ADS =========
+def show_expiring_ads(filtered_df):
+    st.subheader("Annonser som löper ut inom 5 dagar")
+        
+    st.markdown("Endast annonser som snart stänger visas nedan.")
+        
+    column1, column2, column3, column4 = st.columns(4)
+
+    with column1:
+        st.metric("Antal annonser", len(filtered_df))
+    
+    with column2:
+        df_no_experince = filtered_df[filtered_df['experience_required'] == False]
+        num_of_no_experience = len(df_no_experince)
+        st.metric("Antal annonser utan krav på erfarenhet", num_of_no_experience)
+
+    with column3:
+        st.metric("Yrket med flest annonser", filtered_df["occupation"].value_counts().idxmax())
+    
+    with column4:
+        st.metric("Länet med flest annonser", filtered_df['workplace_region'].value_counts().idxmax())
+    
+       
+    st.markdown("---")
+
+    column6, column7 = st.columns([1,2])
+
+    with column6:
+        st.markdown("Kolumn1")
+    
+    with column7:
+        st.markdown("Kolumn 2")
+    
+    st.markdown("---")
+
+    
+    display_df = create_display_df(filtered_df)
+    current_page_df = pagination(display_df)
+    st.dataframe(current_page_df, use_container_width=True)
+
+
+# ======= USING LLM TO SPOT TRENDS ==========
+def get_weekly_occupation_stats(df):
+    df = df.copy()
+
+    df["week"] = pd.to_datetime(df["publication_date"]).dt.isocalendar().week
+    weekly_stats = (
+        df.groupby(["occupation", "week"])
+        .size()
+        .reset_index(name = "num_ads")
+        .sort_values(["occupation", "week"])
+    )
+    return weekly_stats
+
+from utils import gemini_chat
+
+def get_weekly_occupation_stats(df):
+    df = df.copy()
+    df["week"] = pd.to_datetime(df["publication_date"]).dt.isocalendar().week
+    weekly_stats = (
+        df.groupby(["occupation", "week"])
+        .size()
+        .reset_index(name="num_ads")
+        .sort_values(["occupation", "week"])
+    )
+    return weekly_stats
+
+def build_prompt(weekly_stats):
+    # Steg 1: Hämta den "senaste kompletta veckan" (ex: 21, om 22 är pågående)
+    latest_complete_week = weekly_stats["week"].max() - 1
+
+    # Steg 2: Välj de tre veckorna: v19, v20, v21
+    relevant_weeks = [latest_complete_week - 2, latest_complete_week - 1, latest_complete_week]
+    recent_data = weekly_stats[weekly_stats["week"].isin(relevant_weeks)]
+
+    # Steg 3: Skapa prompt
+    prompt = f"""
+Här är en sammanställning av antal jobbannonser per yrke under vecka {relevant_weeks[0]}, {relevant_weeks[1]} och {relevant_weeks[2]}:
+
+{recent_data.to_string(index=False)}
+
+Fokusera på att analysera förändringen i antal annonser mellan vecka {relevant_weeks[1]} och vecka {relevant_weeks[2]}. Identifiera gärna något yrke där det syns en tydlig ökning eller minskning. Skriv max två insikter på svenska som kan hjälpa en rekryterare att agera smart.
+"""
+    return prompt
+
+def show_ai_insight(df):
+    st.markdown("#### Rekryterartips från AI")
+
+    if st.button("Fråga AI om trender de senaste veckorna"):
+        with st.spinner("Analyserar pågår..."):
+            weekly_stats = get_weekly_occupation_stats(df)
+            prompt = build_prompt(weekly_stats)
+            response = gemini_chat(prompt)
+            st.info(response)
+    else:
+        st.caption("Klicka på knappen för att generera en analys")
+    
+
 
 # ======== PAGINATION FUNCTION ======== 
 def pagination(df):
@@ -340,29 +450,27 @@ def main():
     if check_if_dataframe_empty(df, "Inga efter inläsning från databasen."):       
         return
     if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
-        return  
-    
+        return      
 
     if filters.get("expiring_ads", False):
-        st.subheader("Annonser som löper ut inom 3 dagar")
-        
-        st.markdown("Endast annonser som snart stänger visas nedan. Övriga analyser är inaktiverade.")
-        st.markdown("Klicka på 'Rensa filter' i sidomenyn för att återgå till översikten.")
-        display_df = create_display_df(filtered_df)
-        current_page_df = pagination(display_df)
-        st.dataframe(current_page_df, use_container_width=True)
+        show_expiring_ads(filtered_df)        
     
     else:
         show_metric_data(filtered_df)
         st.markdown("---")
 
-        column1, column2 = st.columns(2)
+        column1, column2, column3 = st.columns(3)
     
         with column1:
             employment_type_distribution(filtered_df)
         
         with column2:
-            ads_per_week(filtered_df)
+            aux_attributes(filtered_df)
+
+        with column3:
+            show_ai_insight(filtered_df)
+
+        st.markdown("---")
     
         # Display the data - without the HTML table
         display_df = create_display_df(filtered_df)    
