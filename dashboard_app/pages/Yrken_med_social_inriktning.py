@@ -286,6 +286,30 @@ def employment_type_distribution(df):
     fig.update_layout(showlegend=True)
     st.plotly_chart(fig, use_container_width=True)
 
+def heatmap(df):
+    df = df.dropna(subset=["occupation_group", "workplace_region"])
+
+    pivot_df = df.pivot_table(
+        index = "occupation_group",
+        columns = "workplace_region",
+        values = "occupation",
+        aggfunc = "count", 
+        fill_value = 0
+    )
+    top_occupations = pivot_df.sum(axis = 1).nlargest(10).index
+    top_regions = pivot_df.sum(axis = 0).nlargest(10).index
+
+    filtered_pivot_df = pivot_df.loc[top_occupations, top_regions]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(filtered_pivot_df, cmap="Greens", annot=True, fmt="d", ax=ax)
+    st.pyplot(fig)
+    
+
+    
+
+    
+
 def aux_attributes(df):
     num_driver_license = df["driving_license_required"].sum()
     num_own_car = df["own_car_required"].sum()
@@ -309,7 +333,7 @@ def aux_attributes(df):
         y="Krav", 
         orientation='h', 
         text="Andel (%)", 
-        title="Vanligaste kraven i annonser",
+        title="Andel annonser där krav finns",
         color="Antal",
         color_continuous_scale=["#00441b", "#238b45", "#66c2a4"],
     )
@@ -356,7 +380,6 @@ def show_expiring_ads(filtered_df):
     display_df = create_display_df(filtered_df)
     current_page_df = pagination(display_df)
     st.dataframe(current_page_df, use_container_width=True)
-
 
 # ======= USING LLM TO SPOT TRENDS ==========
 def get_weekly_occupation_stats(df):
@@ -414,6 +437,9 @@ def show_ai_insight(df):
     else:
         st.caption("Klicka på knappen för att generera en analys")
     
+#def matching_with_ad(df);
+    
+
 
 
 # ======== PAGINATION FUNCTION ======== 
@@ -455,27 +481,61 @@ def main():
     if filters.get("expiring_ads", False):
         show_expiring_ads(filtered_df)        
     
-    else:
-        show_metric_data(filtered_df)
-        st.markdown("---")
-
-        column1, column2, column3 = st.columns(3)
+    else:      
     
-        with column1:
-            employment_type_distribution(filtered_df)
+        tab1, tab2, tab3 = st.tabs(["Översikt 📎", "Heatmap 📎", "Matcha kandidater med jobb 📎"])
+
+        with tab1:
+            show_metric_data(filtered_df)
+            st.markdown("---")
+
+            column1, column2, column3 = st.columns(3)
+    
+            with column1:
+                employment_type_distribution(filtered_df)            
+    
         
-        with column2:
-            aux_attributes(filtered_df)
+            with column2:
+                aux_attributes(filtered_df)
 
-        with column3:
-            show_ai_insight(filtered_df)
+            with column3:
+                show_ai_insight(filtered_df)    
 
-        st.markdown("---")
+            st.markdown("---")
+
+        with tab2:
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                heatmap(filtered_df)
+            
+            with col2:
+                st.markdown("""
+                ### Vad visar heatmappen?
+                            
+                Heatmappen visar **antalet jobbannonser** för olika yrkesområden och län under den valda perioden.  
+                Ju mörkare färg, desto fler annonser för den kombinationen av yrke och region. 
+                            
+                ---
+
+                - Identifiera **var det är störst rekryteringsbehov**  
+                            
+                - Se **vilka län som har flest annonser** inom olika yrken  
+                            
+                Använd datan för att prioritera **rekryteringsinsatser**  
+
+                ---            
+                                            
+                Endast **topp 10 yrken/län** visas för tydlighet  
+                            
+                        
+                        """)               
+
     
         # Display the data - without the HTML table
         display_df = create_display_df(filtered_df)    
         current_page_df = pagination(display_df)
-        st.dataframe(current_page_df, use_container_width=True)
+        st.dataframe(current_page_df, use_container_width=True)   
     
     
         # # Display the pagination - with the HTML table
