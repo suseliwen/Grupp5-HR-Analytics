@@ -2,7 +2,6 @@ import streamlit as st
 from utils import load_data
 from utils import get_latest_ingestion
 from utils import gemini_chat
-import google.generativeai as genai
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
@@ -10,6 +9,12 @@ import seaborn as sns
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo #Necessary for timezone conversion
 import logging
+
+def get_color_palette(name="green"):
+    if name == "green":
+        return ["#00441b", "#006d2c", "#238b45", "#399967", "#59aa8f", "#4dbea4"]   
+    else:
+        return px.colors.qualitative.Plotly 
 
 # ======= LOGGING SETUP ========
 logging.basicConfig(
@@ -157,6 +162,7 @@ def create_display_df(filtered_df):
         "occupation_group": "Yrkesområde",
         "workplace_region": "Län",
         "application_deadline": "Sista ansökningsdag",
+        "relevance": "Relevans",
         "application_url": "Annons",
     }
     
@@ -279,7 +285,7 @@ def employment_type_distribution(df):
             names=employment_type_counts.index,
             title="Fördelning av annonser per anställningstyp",
             #labels={"value": "Anställningstyp", "name": "Antal annonser"},
-            color_discrete_sequence=["#00441b", "#006d2c", "#238b45", "#41ae76", "#66c2a4", "#99d8c9"],
+            color_discrete_sequence=get_color_palette("green"),
             hole=0.4,
         )
     #fig.update_traces(textposition="inside", textinfo="percent+label")
@@ -304,11 +310,6 @@ def heatmap(df):
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(filtered_pivot_df, cmap="Greens", annot=True, fmt="d", ax=ax)
     st.pyplot(fig)
-    
-
-    
-
-    
 
 def aux_attributes(df):
     num_driver_license = df["driving_license_required"].sum()
@@ -335,11 +336,71 @@ def aux_attributes(df):
         text="Andel (%)", 
         title="Andel annonser där krav finns",
         color="Antal",
-        color_continuous_scale=["#00441b", "#238b45", "#66c2a4"],
+        color_continuous_scale=get_color_palette("green"),
     )
     
     fig.update_layout(xaxis_title="Antal annonser", yaxis_title="Krav")
     st.plotly_chart(fig, use_container_width=True)
+
+def top_5_jobs(df):
+    top_jobs = df["occupation"].value_counts().head(5).reset_index()
+    top_jobs.columns = ["Yrkestitel", "Antal"]
+
+    fig1 = px.bar(
+            top_jobs,
+            x="Yrkestitel",
+            y="Antal",
+            text="Antal",
+            color="Antal",
+            color_continuous_scale=get_color_palette("green"),
+        )
+
+    fig1.update_layout(
+        margin=dict(l=120, r=20, t=20, b=40),
+        xaxis_title="Yrkestitel",
+        yaxis_title="Antal",
+        yaxis=dict(tickangle=0),
+        coloraxis_colorbar=dict(title="Antal annonser"),
+        height=300,
+    )
+
+    fig1.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
+
+    st.plotly_chart(fig1, use_container_width=True)
+
+def top_5_regions(df):
+    top_regions = df["workplace_region"].value_counts().head(5).reset_index()
+    top_regions.columns = ["Län", "Antal"]
+
+    fig2 = px.bar(
+        top_regions,
+        x="Antal",
+        y="Län",
+        orientation="h",
+        text="Antal",
+        color="Antal",
+        color_continuous_scale=get_color_palette("green")
+    )
+
+    fig2.update_layout(
+        margin=dict(l=120, r=20, t=20, b=40),
+        xaxis_title="Antal",
+        yaxis_title="Län",
+        yaxis=dict(tickangle=0),
+        coloraxis_colorbar=dict(title="Antal annonser"),
+        height=300,
+    )
+
+    fig2.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
+
 
 # ======= EXPIRING ADS =========
 def show_expiring_ads(filtered_df):
@@ -366,13 +427,13 @@ def show_expiring_ads(filtered_df):
        
     st.markdown("---")
 
-    column6, column7 = st.columns([1,2])
+    column6, column7 = st.columns(2)
 
-    with column6:
-        st.markdown("Kolumn1")
+    with column6:        
+        top_5_jobs(filtered_df)
     
     with column7:
-        st.markdown("Kolumn 2")
+        top_5_regions(filtered_df)
     
     st.markdown("---")
 
@@ -393,8 +454,6 @@ def get_weekly_occupation_stats(df):
         .sort_values(["occupation", "week"])
     )
     return weekly_stats
-
-from utils import gemini_chat
 
 def get_weekly_occupation_stats(df):
     df = df.copy()
@@ -436,11 +495,75 @@ def show_ai_insight(df):
             st.info(response)
     else:
         st.caption("Klicka på knappen för att generera en analys")
+
+# ======= MATCHMAKING FUNCTION =======
+def display_matchmaking(df):
+    st.subheader("Matcha arbetssökande med lediga jobb")
+
+    region_options = ["Alla"] + sorted(df["workplace_region"].dropna().unique().tolist())
+    group_options = ["Alla"] + sorted(df["occupation_group"].dropna().unique().tolist())
+
+    # FORM 1: Återställ filtren
+    with st.form("reset_form"):
+        reset = st.form_submit_button("Rensa filter")
+        if reset:
+            st.session_state["driving_license"] = False
+            st.session_state["own_car"] = False
+            st.session_state["experience"] = False
+            st.session_state["match_region"] = "Alla"
+            st.session_state["match_occupation_group"] = "Alla"
+            st.rerun()
+
     
-#def matching_with_ad(df);
-    
+    with st.form("match_profile_form"):
+        driving_license = st.checkbox("Ska kandidaten ha körkort?", key="driving_license")
+        own_car = st.checkbox("Ska kandidaten ha tillgång till egen bil?", key="own_car")
+        experience = st.checkbox("Ska kandidaten ha erfarenhet?", key="experience")
+        workplace_region = st.selectbox("Välj län:", region_options, key="match_region")
+        occupation_group = st.selectbox("Välj yrkesområde:", group_options, key="match_occupation_group")
+
+        submit = st.form_submit_button("Matcha mot lediga jobb")
+
+    if submit:
+        user_profile = {
+            "require_driving_license": driving_license,
+            "require_own_car": own_car,
+            "require_experience": experience,
+            "region": workplace_region,
+            "occupation_group": occupation_group
+        }
+
+        #st.write("Du söker efter: ")
+        #st.json(user_profile)
+
+        matched_df = match_jobs(user_profile, df)        
+        return matched_df
+
+    return None
+
+def match_jobs(user_profile, df):
+    matching_df = df.copy()  
+
+    # 1. Körkort
+    if user_profile["require_driving_license"]:
+        matching_df = matching_df[matching_df["driving_license_required"] == True]
+
+    # 2. Egen bil
+    if user_profile["require_own_car"]:
+        matching_df = matching_df[matching_df["own_car_required"] == True]
+
+    # 3. Erfarenhet
+    if user_profile["require_experience"]:
+        matching_df = matching_df[matching_df["experience_required"] == True]
+
+    if user_profile["region"] != "Alla":
+        matching_df = matching_df[matching_df["workplace_region"] == user_profile["region"]]
+
+    if user_profile["occupation_group"] != "Alla":
+        matching_df = matching_df[matching_df["occupation_group"] == user_profile["occupation_group"]]
 
 
+    return matching_df
 
 # ======== PAGINATION FUNCTION ======== 
 def pagination(df):
@@ -471,7 +594,8 @@ def main():
     # Load the data
     df = load_data("mart.mart_occupation_social")
     filters = display_sidebar(df)
-    filtered_df = apply_sidebar_filters(df, filters)
+    filtered_df = apply_sidebar_filters(df, filters)    
+       
 
     if check_if_dataframe_empty(df, "Inga efter inläsning från databasen."):       
         return
@@ -492,16 +616,21 @@ def main():
             column1, column2, column3 = st.columns(3)
     
             with column1:
-                employment_type_distribution(filtered_df)            
+                top_5_jobs(filtered_df)            
     
         
             with column2:
-                aux_attributes(filtered_df)
+                top_5_regions(filtered_df)
 
             with column3:
                 show_ai_insight(filtered_df)    
 
             st.markdown("---")
+        
+            # Display the data - without the HTML table
+            display_df = create_display_df(filtered_df)    
+            current_page_df = pagination(display_df)
+            st.dataframe(current_page_df, use_container_width=True)  
 
         with tab2:
             col1, col2 = st.columns([2, 1])
@@ -529,13 +658,27 @@ def main():
                 Endast **topp 10 yrken/län** visas för tydlighet  
                             
                         
-                        """)               
+                        """) 
+                   
 
-    
-        # Display the data - without the HTML table
-        display_df = create_display_df(filtered_df)    
-        current_page_df = pagination(display_df)
-        st.dataframe(current_page_df, use_container_width=True)   
+        with tab3:
+            column1, column2 = st.columns(2)
+
+            with column1:
+                matched_df = display_matchmaking(df)
+
+            
+            st.subheader("Lediga tjänster utifrån profil:")
+
+            if matched_df is not None:
+                st.text(f"{len(matched_df)} matchade annonser")
+                display_df = create_display_df(matched_df)
+                curr_page_df = pagination(display_df)
+                st.dataframe(curr_page_df, use_container_width=True)
+            else:
+                st.info("Ingen matchning har gjorts ännu eller inga annonser matchade.")
+
+        
     
     
         # # Display the pagination - with the HTML table
