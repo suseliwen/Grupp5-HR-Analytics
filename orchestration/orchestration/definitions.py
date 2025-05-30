@@ -1,6 +1,7 @@
 
 from dagster import Definitions, load_assets_from_modules
-from orchestration import assets
+import assets
+#from orchestration import assets
 from dagster import define_asset_job, AssetSelection, ScheduleDefinition
 
 # Load all @asset-decorated functions from the assets module
