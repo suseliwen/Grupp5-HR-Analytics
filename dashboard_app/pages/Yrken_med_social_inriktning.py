@@ -297,7 +297,7 @@ def heatmap(df):
 
     pivot_df = df.pivot_table(
         index = "occupation_group",
-        columns = "workplace_region",
+        columns = "workplace_region",        
         values = "occupation",
         aggfunc = "count", 
         fill_value = 0
@@ -309,6 +309,9 @@ def heatmap(df):
 
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(filtered_pivot_df, cmap="Greens", annot=True, fmt="d", ax=ax)
+    ax.set_xlabel("Län")
+    ax.set_ylabel("Yrkesgrupp")  # Index
+    ax.set_title("Antal annonser per yrkesgrupp och län")
     st.pyplot(fig)
 
 def aux_attributes(df):
@@ -343,13 +346,15 @@ def aux_attributes(df):
     st.plotly_chart(fig, use_container_width=True)
 
 def top_5_jobs(df):
-    top_jobs = df["occupation"].value_counts().head(5).reset_index()
-    top_jobs.columns = ["Yrkestitel", "Antal"]
+    top_jobs = df["occupation_group"].value_counts().head(5).reset_index()
+    top_jobs.columns = ["Yrkesgrupp", "Antal"]
+    top_jobs["Yrkesgrupp_kort"] = top_jobs["Yrkesgrupp"].apply(lambda x: " ".join(x.split()[:2]))
 
     fig1 = px.bar(
             top_jobs,
-            x="Yrkestitel",
-            y="Antal",
+            x="Antal",
+            y="Yrkesgrupp_kort",
+            orientation= "h",
             text="Antal",
             color="Antal",
             color_continuous_scale=get_color_palette("green"),
@@ -357,8 +362,8 @@ def top_5_jobs(df):
 
     fig1.update_layout(
         margin=dict(l=120, r=20, t=20, b=40),
-        xaxis_title="Yrkestitel",
-        yaxis_title="Antal",
+        xaxis_title="Antal",
+        yaxis_title="Yrkesgrupp",
         yaxis=dict(tickangle=0),
         coloraxis_colorbar=dict(title="Antal annonser"),
         height=300,
@@ -400,6 +405,24 @@ def top_5_regions(df):
     )
 
     st.plotly_chart(fig2, use_container_width=True)
+
+def ads_publication_timeline(df):
+    if df.empty or df["publication_date"].dropna().empty:
+        st.info("Inga annonser att visa.")
+        return
+
+    ads_per_day = df["publication_date"].value_counts().sort_index()
+    
+    fig = px.bar(
+        x=ads_per_day.index,
+        y=ads_per_day.values,
+        labels={"x": "Datum", "y": "Antal annonser"},
+        title="Publiceringsdatum för matchade annonser",
+        color=ads_per_day.values,
+        color_continuous_scale=get_color_palette("green")
+    )
+    fig.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ======= EXPIRING ADS =========
@@ -445,7 +468,6 @@ def show_expiring_ads(filtered_df):
 # ======= USING LLM TO SPOT TRENDS ==========
 def get_weekly_occupation_stats(df):
     df = df.copy()
-
     df["week"] = pd.to_datetime(df["publication_date"]).dt.isocalendar().week
     weekly_stats = (
         df.groupby(["occupation", "week"])
@@ -455,16 +477,6 @@ def get_weekly_occupation_stats(df):
     )
     return weekly_stats
 
-def get_weekly_occupation_stats(df):
-    df = df.copy()
-    df["week"] = pd.to_datetime(df["publication_date"]).dt.isocalendar().week
-    weekly_stats = (
-        df.groupby(["occupation", "week"])
-        .size()
-        .reset_index(name="num_ads")
-        .sort_values(["occupation", "week"])
-    )
-    return weekly_stats
 
 def build_prompt(weekly_stats):
     # Steg 1: Hämta den "senaste kompletta veckan" (ex: 21, om 22 är pågående)
@@ -480,7 +492,9 @@ Här är en sammanställning av antal jobbannonser per yrke under vecka {relevan
 
 {recent_data.to_string(index=False)}
 
-Fokusera på att analysera förändringen i antal annonser mellan vecka {relevant_weeks[1]} och vecka {relevant_weeks[2]}. Identifiera gärna något yrke där det syns en tydlig ökning eller minskning. Skriv max två insikter på svenska som kan hjälpa en rekryterare att agera smart.
+Fokusera på att analysera förändringen i antal annonser mellan vecka {relevant_weeks[1]} och vecka {relevant_weeks[2]}. 
+Identifiera gärna något yrke där det syns en tydlig ökning eller minskning. 
+Skriv max två insikter på svenska som kan hjälpa en rekryterare att agera smart.
 """
     return prompt
 
@@ -495,6 +509,8 @@ def show_ai_insight(df):
             st.info(response)
     else:
         st.caption("Klicka på knappen för att generera en analys")
+
+
 
 # ======= MATCHMAKING FUNCTION =======
 def display_matchmaking(df):
@@ -516,11 +532,11 @@ def display_matchmaking(df):
 
     
     with st.form("match_profile_form"):
-        driving_license = st.checkbox("Ska kandidaten ha körkort?", key="driving_license")
-        own_car = st.checkbox("Ska kandidaten ha tillgång till egen bil?", key="own_car")
-        experience = st.checkbox("Ska kandidaten ha erfarenhet?", key="experience")
-        workplace_region = st.selectbox("Välj län:", region_options, key="match_region")
-        occupation_group = st.selectbox("Välj yrkesområde:", group_options, key="match_occupation_group")
+        driving_license = st.checkbox("Har kandidaten körkort?", key="driving_license")
+        own_car = st.checkbox("Har kandidaten tillgång till egen bil?", key="own_car")
+        experience = st.checkbox("Har kandidaten erfarenhet?", key="experience")
+        workplace_region = st.multiselect("Välj län:", region_options, key="match_region")
+        occupation_group = st.multiselect("Välj yrkesområde:", group_options, key="match_occupation_group")
 
         submit = st.form_submit_button("Matcha mot lediga jobb")
 
@@ -544,23 +560,23 @@ def display_matchmaking(df):
 def match_jobs(user_profile, df):
     matching_df = df.copy()  
 
-    # 1. Körkort
-    if user_profile["require_driving_license"]:
-        matching_df = matching_df[matching_df["driving_license_required"] == True]
+    
+    if not user_profile["require_driving_license"]:
+        matching_df = matching_df[matching_df["driving_license_required"] == False]
+    
+    if not user_profile["require_own_car"]:
+        matching_df = matching_df[matching_df["own_car_required"] == False] 
+   
+    if not user_profile["require_experience"]:
+        matching_df = matching_df[matching_df["experience_required"] == False]
 
-    # 2. Egen bil
-    if user_profile["require_own_car"]:
-        matching_df = matching_df[matching_df["own_car_required"] == True]
-
-    # 3. Erfarenhet
-    if user_profile["require_experience"]:
-        matching_df = matching_df[matching_df["experience_required"] == True]
-
-    if user_profile["region"] != "Alla":
-        matching_df = matching_df[matching_df["workplace_region"] == user_profile["region"]]
-
-    if user_profile["occupation_group"] != "Alla":
-        matching_df = matching_df[matching_df["occupation_group"] == user_profile["occupation_group"]]
+    region_selection = user_profile["region"]
+    if region_selection and "Alla" not in region_selection:
+            matching_df = matching_df[matching_df["workplace_region"].isin(region_selection)]
+   
+    occupation_selection = user_profile["occupation_group"]
+    if occupation_selection and "Alla" not in occupation_selection:
+        matching_df = matching_df[matching_df["occupation_group"].isin(occupation_selection)]
 
 
     return matching_df
@@ -571,10 +587,15 @@ def pagination(df):
 
     rows_per_page = 100 
     total_rows = len(df)
+
+    if total_rows == 0:
+        st.warning("Inga annonser att visa")
+        return df
+    
     total_pages = (total_rows - 1) // rows_per_page + 1 
 
 
-    page = st.number_input("Sida", min_value=0, max_value=total_pages, value=1, step=1)
+    page = st.number_input("Sida", min_value=1, max_value=total_pages, value=1, step=1)
 
     start_idx = (page - 1) * rows_per_page
     end_idx = min(start_idx + rows_per_page, total_rows)
@@ -616,10 +637,12 @@ def main():
             column1, column2, column3 = st.columns(3)
     
             with column1:
+                st.subheader("Yrkesgrupper med flest lediga tjänster")
                 top_5_jobs(filtered_df)            
     
         
             with column2:
+                st.subheader("Regioner med flest lediga tjänster")
                 top_5_regions(filtered_df)
 
             with column3:
@@ -651,7 +674,7 @@ def main():
                             
                 - Se **vilka län som har flest annonser** inom olika yrken  
                             
-                Använd datan för att prioritera **rekryteringsinsatser**  
+                - Använd datan för att prioritera **rekryteringsinsatser**  
 
                 ---            
                                             
@@ -668,15 +691,25 @@ def main():
                 matched_df = display_matchmaking(df)
 
             
-            st.subheader("Lediga tjänster utifrån profil:")
+            st.subheader("Lediga tjänster utifrån profil:") 
 
-            if matched_df is not None:
+            if check_if_dataframe_empty(filtered_df, "Inga annonser matchar din filtrering. Försök igen!"):
+                return           
+
+            elif matched_df is not None:
                 st.text(f"{len(matched_df)} matchade annonser")
                 display_df = create_display_df(matched_df)
                 curr_page_df = pagination(display_df)
                 st.dataframe(curr_page_df, use_container_width=True)
+            
+            if matched_df is not None and not matched_df.empty:                
+                with column2:
+                    st.subheader("Publicering av matchade annonser")
+                    ads_publication_timeline(matched_df)
             else:
-                st.info("Ingen matchning har gjorts ännu eller inga annonser matchade.")
+                with column2:
+                    st.info("Ingen data att visa. Gör en matchning först.")
+            
 
         
     

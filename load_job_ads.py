@@ -3,6 +3,8 @@
 This script loads data (job ads) from the JobTech API into a DLT pipeline, and saves the ads into a DuckDB database.
 It handles API-pagination, filters results by specified occupation fields, and organizes the data under a staging dataset.
 """
+
+import config
 import dlt
 import requests
 import json
@@ -10,6 +12,11 @@ from pathlib import Path
 import os
 import duckdb
 from datetime import datetime
+
+if config.USE_TEST_DB:
+    db_path = config.TEST_DB_PATH
+else:
+    db_path = config.PROD_DB_PATH
 
 # Function to fetch distinct IDs from the DuckDB database.
 # This is used to avoid duplicate entries when loading data.
