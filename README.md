@@ -27,7 +27,7 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 
 - Extract data: python extraction/jobtech_api.py
 - Transform data: dbt run
-- Launch dashboard: streamlit run dashboard/app.py
+- Launch dashboard: streamlit run dashboard_app/jobads_dashboard.py
 
 ### Dashboard Features
 
