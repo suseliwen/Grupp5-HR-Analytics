@@ -11,17 +11,8 @@ import os
 import duckdb
 from datetime import datetime
 
-# Function to fetch distinct IDs from the DuckDB database.
-# This is used to avoid duplicate entries when loading data.
-def get_existing_ids():
-    try:
-        con = duckdb.connect("jobads_data_warehouse.duckdb")
-        result = con.execute("SELECT DISTINCT id FROM job_ads").fetchall()
-        con.close()
-        return {row[0] for row in result}
-    except Exception as e:
-        print(f"Error fetching existing IDs: {e}")
-        return set()
+# Define the direct path to the DuckDB database file.
+DATABASE_PATH = Path(__file__).parent / "jobads_data_warehouse.duckdb"
 
 # Sends a GET-request to the URL, with specified parameters and headers.
 # Raises an exception if the request fails.
@@ -34,8 +25,11 @@ def _get_ads(url_for_search, params):
 
 # Loads data (job ads) from the specified URL into a DLT-pipeline.
 # The function is a DLT resource, which means it can be used to load data into a DLT pipeline.
-@dlt.resource(write_disposition="append")
-def jobsearch_resource(params, existing_ids):
+@dlt.resource(
+    primary_key="id",
+    write_disposition="merge" # Use "merge" to update existing ids and insert new ones.
+)
+def jobsearch_resource(params):
     # Set up API URL and pagination parameters: 'limit' defines page size, 'offset' defines starting point.
     url = "https://jobsearch.api.jobtechdev.se"
     url_for_search = f"{url}/search"
@@ -53,9 +47,7 @@ def jobsearch_resource(params, existing_ids):
 
         # Yield each ad from the current page and check if ad already exists in the database.
         for ad in hits:
-            ad_id = ad.get("id")
-            if ad_id and ad_id not in existing_ids:
-                ad["ingestion_timestamp"] = datetime.now().isoformat() #To enable viualization of the latest data ingestion in the Streamlit app
+                ad["ingestion_timestamp"] = datetime.now().isoformat() # Add ingestion timestamp to each ad
                 yield ad
 
         # If fewer ads than the limit are returned, or if the offset exceeds 1900, stop fetching.
@@ -69,18 +61,15 @@ def jobsearch_resource(params, existing_ids):
 def run_pipeline(query, table_name, occupation_fields):
     pipeline = dlt.pipeline(
         pipeline_name="jobads_project",
-        destination=dlt.destinations.duckdb("jobads_data_warehouse.duckdb"),
+        destination=dlt.destinations.duckdb(str(DATABASE_PATH)), # Direct path to the DuckDB database file
         dataset_name="staging",
-    )
-
-    # Get existing IDs from the database to avoid duplicates.
-    existing_ids = get_existing_ids()
-    
+    ) 
     # Iterate over each occupation field and load job ads into the pipeline.
     for occupation_field in occupation_fields:
         params = {"q": query, "limit": 100, "occupation-field": occupation_field}
         load_info = pipeline.run(
-            jobsearch_resource(params=params, existing_ids=existing_ids),
+            #jobsearch_resource(params=params, existing_ids=existing_ids),
+            jobsearch_resource(params=params),
             table_name=table_name
         )
         print(f"Occupation field: {occupation_field}")
@@ -94,7 +83,6 @@ if __name__ == "__main__":
 
     query = ""
     table_name = "job_ads"
-
     # "Yrken med social inriktning",  "Yrken med teknisk inriktning", "Chefer och verksamhetsledare"
     occupation_fields = ("GazW_2TU_kJw", "6Hq3_tKo_V57", "bh3H_Y3h_5eD")
 
