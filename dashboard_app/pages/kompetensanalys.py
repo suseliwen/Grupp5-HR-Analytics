@@ -26,18 +26,11 @@ def load_job_data(occupation_field=None, limit=15):
         with DataBase_Connection() as conn:
             if occupation_field == 'Alla' or occupation_field is None:                
                 tables = list(OCCUPATION_MAP.values())
-                union_queries = [
-                    f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL" 
-                    for table in tables
-                ]
+                union_queries = [f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL" for table in tables]
                 query = f"({' UNION ALL '.join(union_queries)}) ORDER BY job_id DESC LIMIT {limit}"
             else:
-                table = OCCUPATION_MAP.get(occupation_field)
-                if not table:
-                    st.error(f"Okänt yrkesområde: {occupation_field}")
-                    return pd.DataFrame()
-                
-                query = f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL ORDER BY job_id DESC LIMIT {limit}"
+                table = OCCUPATION_MAP.get(occupation_field, 'mart_occupation_social')
+                query = f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL LIMIT {limit}"
             
             return conn.execute(query).fetchdf()
     except Exception as e:
