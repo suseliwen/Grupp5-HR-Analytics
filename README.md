@@ -49,9 +49,9 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 
 ### Sources
 
-- Jobtech API - Swedish Public Employment Service API
-- Geographic Data - Municipality and region mappings
-- Streamlit Documentation - Dashboard framework
+- [Jobtech API](https://jobsearch.api.jobtechdev.se/) - Swedish Public Employment Service API
+- [Geographic Data](https://github.com/okfse/sweden-geojson) - Municipality and region mappings
+- [Streamlit Documentation](https://docs.streamlit.io/) - Dashboard framework
 
 ### Development Tools
 
