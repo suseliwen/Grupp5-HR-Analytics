@@ -1,18 +1,21 @@
-
 """
 This script loads data (job ads) from the JobTech API into a DLT pipeline, and saves the ads into a DuckDB database.
 It handles API-pagination, filters results by specified occupation fields, and organizes the data under a staging dataset.
 """
+
+import config
 import dlt
 import requests
 import json
 from pathlib import Path
 import os
-import duckdb
 from datetime import datetime
 
-# Define the direct path to the DuckDB database file.
-DATABASE_PATH = Path(__file__).parent / "jobads_data_warehouse.duckdb"
+# Sätt rätt databasväg (test eller produktion)
+if config.USE_TEST_DB:
+    db_path = config.TEST_DB_PATH
+else:
+    db_path = config.PROD_DB_PATH
 
 # Sends a GET-request to the URL, with specified parameters and headers.
 # Raises an exception if the request fails.
@@ -27,10 +30,9 @@ def _get_ads(url_for_search, params):
 # The function is a DLT resource, which means it can be used to load data into a DLT pipeline.
 @dlt.resource(
     primary_key="id",
-    write_disposition="merge" # Use "merge" to update existing ids and insert new ones.
+    write_disposition="merge"  # Use "merge" to update existing ids and insert new ones.
 )
 def jobsearch_resource(params):
-    # Set up API URL and pagination parameters: 'limit' defines page size, 'offset' defines starting point.
     url = "https://jobsearch.api.jobtechdev.se"
     url_for_search = f"{url}/search"
     limit = params.get("limit", 100)
@@ -40,50 +42,42 @@ def jobsearch_resource(params):
         page_params = dict(params, offset=offset)
         data = _get_ads(url_for_search, page_params)
 
-        # Get list of job ads from response.
         hits = data.get("hits", [])
         if not hits:            
             break
 
-        # Yield each ad from the current page and check if ad already exists in the database.
         for ad in hits:
-                ad["ingestion_timestamp"] = datetime.now().isoformat() # Add ingestion timestamp to each ad
-                yield ad
+            ad["ingestion_timestamp"] = datetime.now().isoformat()
+            yield ad
 
-        # If fewer ads than the limit are returned, or if the offset exceeds 1900, stop fetching.
         if len(hits) < limit or offset > 1900:
             break
 
         offset += limit
 
 # Creates and runs a DLT pipeline to load job ads for specified occupation fields.
-# The pipeline is configured to write to a DuckDB database.
 def run_pipeline(query, table_name, occupation_fields):
     pipeline = dlt.pipeline(
         pipeline_name="jobads_project",
-        destination=dlt.destinations.duckdb(str(DATABASE_PATH)), # Direct path to the DuckDB database file
+        destination=dlt.destinations.duckdb(db_path),  # Använd db_path
         dataset_name="staging",
-    ) 
-    # Iterate over each occupation field and load job ads into the pipeline.
+    )
+
     for occupation_field in occupation_fields:
         params = {"q": query, "limit": 100, "occupation-field": occupation_field}
         load_info = pipeline.run(
-            #jobsearch_resource(params=params, existing_ids=existing_ids),
             jobsearch_resource(params=params),
             table_name=table_name
         )
         print(f"Occupation field: {occupation_field}")
         print(load_info)
 
-# Main function to execute the script.
-# It sets the working directory, defines parameters, and calls the run_pipeline function.
 if __name__ == "__main__":
     working_directory = Path(__file__).parent
     os.chdir(working_directory)
 
     query = ""
     table_name = "job_ads"
-    # "Yrken med social inriktning",  "Yrken med teknisk inriktning", "Chefer och verksamhetsledare"
     occupation_fields = ("GazW_2TU_kJw", "6Hq3_tKo_V57", "bh3H_Y3h_5eD")
 
     run_pipeline(query, table_name, occupation_fields)
