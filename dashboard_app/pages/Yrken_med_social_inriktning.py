@@ -23,7 +23,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 # ======= PAGE SETUP ========
-
 now = datetime.now(ZoneInfo("Europe/Stockholm")).date()
 
 # ======= ERROR HANDLING ========
@@ -55,7 +54,7 @@ def display_sidebar(df):
     spacer = st.sidebar.empty()
     spacer.markdown("<hr style='margin: 0.1rem 0;'>", unsafe_allow_html=True)
 
-    # Add toggle to show ads which expires within 3 days
+    # Add toggle to show ads which expires within 5 days
     show_expiring_ads = st.sidebar.toggle(
         "### Se annonser som löper ut inom fem dagar",
         value=False,
@@ -151,6 +150,7 @@ def apply_sidebar_filters(df, filters):
     return filtered_df
 
 # ======= DISPLAY DATAFRAME FUNCTION ========
+
 def create_display_df(filtered_df):    
     
     # Define the columns to display
@@ -161,8 +161,7 @@ def create_display_df(filtered_df):
         "occupation": "Yrkestitel",
         "occupation_group": "Yrkesområde",
         "workplace_region": "Län",
-        "application_deadline": "Sista ansökningsdag",
-        "relevance": "Relevans",
+        "application_deadline": "Sista ansökningsdag",        
         "application_url": "Annons",
     }
     
@@ -173,7 +172,51 @@ def create_display_df(filtered_df):
         [list(columns_to_show.keys())]
         .rename(columns=columns_to_show)               
     )
+
+    # Function to display the link as the text 'Öppna annons' and open the URL in a new tab
+    def make_link(url):
+        if pd.notnull(url):
+            return f'<a href="{url}" target="_blank">Öppna annons</a>'
+        else:
+            return("Länk till annons saknas.")
+        
+    display_df["Annons"] = display_df["Annons"].apply(make_link)
+
     return display_df
+
+def show_html_table(df): #Code copied and pasted from
+      st.markdown("""
+        <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem; /* Gör texten mindre */
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 4px 8px; /* Mindre padding för mindre "chunky" känsla */
+            text-align: left;
+        }
+        th {
+            background-color: #f0f2f6; /* Ljus bakgrund för header */
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9; /* Randig effekt för bättre läsbarhet */
+        }
+        a {
+            color: #0066cc; /* Snygg blå länkfärg */
+            text-decoration: none; /* Ingen understrykning */
+        }
+        a:hover {
+            text-decoration: underline; /* Understrykning när man hovrar */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+      
+      html_table = df.to_html(escape = False, index = False)
+      st.markdown(html_table, unsafe_allow_html= True)
+
+    
 
 # ======== SHOW METRIC DATA FUNCTION ========
 def show_metric_data(df):
@@ -272,7 +315,7 @@ def show_metric_data(df):
             st.plotly_chart(fig, use_container_width=True)     
 
 # ======== PLOTTING FUNCTIONS ========
-def employment_type_distribution(df):
+def employment_type_distribution(df): 
     if df.empty or df["employment_type"].dropna().empty:
         st.info("Inga annonser matchar dina val.")
         return
@@ -426,6 +469,8 @@ def ads_publication_timeline(df):
 
 
 # ======= EXPIRING ADS =========
+# This fuction is used to show ads tha will expire whitin the given days.
+# Number of days is set in the 'display_sidebar'-function!
 def show_expiring_ads(filtered_df):
     st.subheader("Annonser som löper ut inom 5 dagar")
         
@@ -463,7 +508,9 @@ def show_expiring_ads(filtered_df):
     
     display_df = create_display_df(filtered_df)
     current_page_df = pagination(display_df)
-    st.dataframe(current_page_df, use_container_width=True)
+    show_html_table(current_page_df)
+
+      
 
 # ======= USING LLM TO SPOT TRENDS ==========
 def get_weekly_occupation_stats(df):
@@ -476,7 +523,6 @@ def get_weekly_occupation_stats(df):
         .sort_values(["occupation", "week"])
     )
     return weekly_stats
-
 
 def build_prompt(weekly_stats):
     # Steg 1: Hämta den "senaste kompletta veckan" (ex: 21, om 22 är pågående)
@@ -510,16 +556,16 @@ def show_ai_insight(df):
     else:
         st.caption("Klicka på knappen för att generera en analys")
 
-
-
 # ======= MATCHMAKING FUNCTION =======
+#The feature allows the recruiter to match a candidate to suitable jobs, based on their preferences and skills.
 def display_matchmaking(df):
+    
     st.subheader("Matcha arbetssökande med lediga jobb")
 
     region_options = ["Alla"] + sorted(df["workplace_region"].dropna().unique().tolist())
     group_options = ["Alla"] + sorted(df["occupation_group"].dropna().unique().tolist())
 
-    # FORM 1: Återställ filtren
+   
     with st.form("reset_form"):
         reset = st.form_submit_button("Rensa filter")
         if reset:
@@ -582,26 +628,46 @@ def match_jobs(user_profile, df):
     return matching_df
 
 # ======== PAGINATION FUNCTION ======== 
-def pagination(df):
+# This function handles pagination (splitting data into pages) for dataframes, making it easier to browse large datasets.
+# The prefix-parameter ensures an unique widget keys, so the same function can be used across multiple tabs or filter views.
+def pagination(df, prefix="pagination"):
     st.markdown("#### Annonser utifrån dina val, sorterat efter publiceringsdatum")
 
-    rows_per_page = 100 
+    rows_per_page = 25 
     total_rows = len(df)
 
     if total_rows == 0:
         st.warning("Inga annonser att visa")
         return df
     
-    total_pages = (total_rows - 1) // rows_per_page + 1 
+    column1, column2, column3 = st.columns([1, 1, 2])
 
+    with column1:
+        sort_column = st.selectbox("Sortera efter kolumn:", options=df.columns.tolist(), key=f"{prefix}sort_column") 
+    
+    with column2: 
+        ascending = st.radio("Ordning:", ["Stigande", "Fallande"], key=f"{prefix}sort_order") == "Stigande"
 
-    page = st.number_input("Sida", min_value=1, max_value=total_pages, value=1, step=1)
+    column4, column5 = st.columns([1, 3])
 
+    with column4:
+        page = st.selectbox(
+            "Välj sida:",
+            options=list(range(1, (total_rows - 1) // rows_per_page + 2)),
+            index=st.session_state.get("current_page", 1) - 1,
+            key=f"{prefix}page_select"
+        )
+        st.session_state["current_page"] = page
+  
+    df_sorted = df.sort_values(sort_column, ascending=ascending)
+    
     start_idx = (page - 1) * rows_per_page
     end_idx = min(start_idx + rows_per_page, total_rows)
-    current_page_df = df.iloc[start_idx:end_idx]
+    current_page_df = df_sorted.iloc[start_idx:end_idx]
+
     st.markdown(f"Visar {len(current_page_df)} rader (av {len(df)} matchande annonser)")
     return current_page_df
+
 
 # ======== MAIN FUNCTION ========
 
@@ -624,7 +690,8 @@ def main():
         return      
 
     if filters.get("expiring_ads", False):
-        show_expiring_ads(filtered_df)        
+        show_expiring_ads(filtered_df)
+        
     
     else:      
     
@@ -648,12 +715,14 @@ def main():
             with column3:
                 show_ai_insight(filtered_df)    
 
-            st.markdown("---")
+            st.markdown("---")          
+          
         
-            # Display the data - without the HTML table
+            
             display_df = create_display_df(filtered_df)    
-            current_page_df = pagination(display_df)
-            st.dataframe(current_page_df, use_container_width=True)  
+            current_page_df = pagination(display_df, prefix="tab1")
+
+            show_html_table(current_page_df)
 
         with tab2:
             col1, col2 = st.columns([2, 1])
@@ -699,7 +768,7 @@ def main():
             elif matched_df is not None:
                 st.text(f"{len(matched_df)} matchade annonser")
                 display_df = create_display_df(matched_df)
-                curr_page_df = pagination(display_df)
+                curr_page_df = pagination(display_df, prefix = "tab3")
                 st.dataframe(curr_page_df, use_container_width=True)
             
             if matched_df is not None and not matched_df.empty:                
@@ -714,9 +783,7 @@ def main():
         
     
     
-        # # Display the pagination - with the HTML table
-        # current_page_df = pagination(display_df)
-        # st.markdown(current_page_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+     
     
 
 if __name__ == "__main__":
