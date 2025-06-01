@@ -1,15 +1,15 @@
-# IDE
+# === IDE ===
 .vscode/
 
-# Byte-compiled / optimized / DLL files
+# === Byte-compiled / optimized / DLL files ===
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
+# === extensions ===
 *.so
 
-# Distribution / packaging
+# === Distribution / packaging ===
 .Python
 build/
 develop-eggs/
@@ -29,17 +29,17 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
+# === PyInstaller ===
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
-# Installer logs
+# === Installer logs ===
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# === Unit test / coverage reports ===
 htmlcov/
 .tox/
 .nox/
@@ -54,34 +54,33 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Translations
+# === Translations ===
 *.mo
 *.pot
 
-# Django stuff:
+# === Django stuff ===
 *.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Flask stuff:
+# === Flask stuff ===
 instance/
 .webassets-cache
 
-# Scrapy stuff:
+# === Scrapy stuff ===
 .scrapy
 
-# Sphinx documentation
+# === Sphinx documentation ===
 docs/_build/
 
-# PyBuilder
+# === PyBuilder ===
 .pybuilder/
-target/
 
-# Jupyter Notebook
+# === Jupyter Notebook ===
 .ipynb_checkpoints
 
-# IPython
+# === IPython ===
 profile_default/
 ipython_config.py
 
@@ -120,17 +119,17 @@ ipython_config.py
 .pdm-python
 .pdm-build/
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+# ===  PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm ===
 __pypackages__/
 
-# Celery stuff
+# === Celery stuff ===
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
+# === SageMath parsed files ===
 *.sage.py
 
-# Environments
+# === Environments ===
 .env
 .venv
 env/
@@ -139,98 +138,106 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
+# === Spyder project settings ===
 .spyderproject
 .spyproject
 
-# Rope project settings
+# === Rope project settings ===
 .ropeproject
 
-# mkdocs documentation
+# === mkdocs documentation ===
 /site
 
-# mypy
+# === mypy ===
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
+# === Pyre type checker ===
 .pyre/
 
-# pytype static type analyzer
+# === pytype static type analyzer ===
 .pytype/
 
-# Cython debug symbols
+# === Cython debug symbols ===
 cython_debug/
 
-# PyCharm
+# === PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Ruff stuff:
+# === Ruff stuff ===
 .ruff_cache/
 
-# PyPI configuration file
+# === PyPI configuration file ===
 .pypirc
 
 
-# DuckDB database files
+# === DuckDB database files ===
 *.duckdb
 *.duckdb.wal
 
-# dbt artifacts
+# === dbt artifacts ===
 dbt_packages/
 target/
 dbt_modules/
 
-# dbt logs
+# === dbt logs ===
 logs/
 
-# zip-files
+# === zip-files ===
 *.zip
 
-# ========== DAGSTER ==========
-# Dagster instance and tmp storage
+# === DAGSTER ===
 .dagster/
 dagster_home/
 storage/
 **/.tmp_dagster_home_*/
 
-# ========== STREAMLIT SPECIFIC ==========
-# Streamlit secrets and config
+# === STREAMLIT SPECIFIC ===
 .streamlit/
 .streamlit/secrets.toml
 
-# ========== LLM/AI SPECIFIC ==========
-# AI model cache and responses
+# === LLM/AI SPECIFIC ===
 cache/
 **/cache/
 *.cache
 
-# LLM API responses and analysis results
+# === LLM API responses and analysis results ===
 api_responses/
 analysis_results/
 gemini_responses/
 llm_output/
 
-# AI model files (if downloading models locally)
+# === AI model files (if downloading models locally) ===
 models/
 *.model
 *.bin
 *.gguf
 *.safetensors
 
-# Large AI datasets
+# === Large AI datasets ===
 datasets/
 data/raw/
 *.parquet
 *.feather
 
-# AI experiment tracking
+# === AI experiment tracking ===
 wandb/
 mlruns/
 .neptune/
 
+# === EXTRA SECURITY ===
+*api_key*
+*secret*
+*token*
+*password*
+config.json
+credentials.json
+
+# === PROJECT DATA ===
+*.csv
+!sample_data/*.csv  # Allow sample files
