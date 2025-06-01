@@ -62,15 +62,14 @@ def get_latest_ingestion():
         print(f"Fel vid hämtning av data: {e}")
         return None
 
-
-# === LLM FUNKTIONALITET ===
+# === AI MODEL SETUP ===
 def setup_gemini():
 
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
-    
+
     if not api_key:
-        api_key = st.sidebar.text_input("Gemini API Key:", type="password")    
+        api_key = st.sidebar.text_input("Gemini API Key:", type="password")
     if not api_key:
         st.sidebar.error("API key required")
         return None
@@ -84,32 +83,30 @@ def setup_gemini():
         st.sidebar.error("Invalid API key")
         return None
 
- 
-# === PROCESSING JOB TEXT WITH GEMINI ===
+# === AI JOB ANALYSIS ===
 @st.cache_data
 def analyze_job_with_gemini(job_text, occupation_field=None):
     model = setup_gemini()
     if not model:
         return None
     
-    # Map occupation field to area
     area_mapping = {
         'Yrken med social inriktning': 'Social',
         'Yrken med teknisk inriktning': 'Teknisk', 
         'Chefer och verksamhetsledare': 'Chefer'
     }
-    
+
     område = area_mapping.get(occupation_field, 'Okänt')
-    # Avoid exceeding token limits
+
     short_job_text = job_text[:500] if len(job_text) > 500 else job_text
-    
+
     prompt = f"""HR Analytics-specialist: Analysera jobbannons från Arbetsförmedlingen.
 
 {short_job_text}
 
 Returnera ENDAST giltigt JSON:
 {{
-    "krav": ["obligatoriska kompetenser"],
+    "krav": ["korta nyckelord för kompetenser, max 3 ord per kompetens"],
     "meriterande": ["önskvärda kompetenser"],
     "språk": ["programmeringsspråk/främmande språk"],
     "verktyg": ["mjukvaror/verktyg/plattformar"],
@@ -130,8 +127,7 @@ Fokusområden:
     except Exception as e:
         st.error(f"Gemini API fel: {e}")
 
-
-# === VALIDATION OF GEMINI ANSWERS ===
+# === AI RESPONSE VALIDATION ===
 def validate_gemini_response(response_text):
     if not response_text:
         return None        
