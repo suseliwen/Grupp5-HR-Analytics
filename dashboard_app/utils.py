@@ -62,18 +62,17 @@ def get_latest_ingestion():
         print(f"Fel vid hämtning av data: {e}")
         return None
 
-
-# === LLM FUNKTIONALITET ===
+# === AI MODEL SETUP ===
 def setup_gemini():
 
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", None)
-    
+
     if not api_key:
-        api_key = st.sidebar.text_input("Gemini API Key:", type="password")    
+        api_key = st.sidebar.text_input("Gemini API Key:", type="password")
     if not api_key:
         st.sidebar.error("API key required")
-        return None   
+        return None
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
@@ -84,35 +83,43 @@ def setup_gemini():
         st.sidebar.error("Invalid API key")
         return None
 
- 
-# === PROCESSING JOB TEXT WITH GEMINI ===
+# === AI JOB ANALYSIS ===
 @st.cache_data
-def analyze_job_with_gemini(job_text):
-
+def analyze_job_with_gemini(job_text, occupation_field=None):
     model = setup_gemini()
     if not model:
-        return None    
-    prompt = f"""
-Du är en HR Analytics-specialist som arbetar för en rekryteringsbyrå. Analysera denna jobbannons från Arbetsförmedlingen:
+        return None
+    
+    area_mapping = {
+        'Yrken med social inriktning': 'Social',
+        'Yrken med teknisk inriktning': 'Teknisk', 
+        'Chefer och verksamhetsledare': 'Chefer'
+    }
 
-{job_text}
+    område = area_mapping.get(occupation_field, 'Okänt')
+
+    short_job_text = job_text[:500] if len(job_text) > 500 else job_text
+
+    prompt = f"""HR Analytics-specialist: Analysera jobbannons från Arbetsförmedlingen.
+
+{short_job_text}
 
 Returnera ENDAST giltigt JSON:
 {{
-    "krav": ["skill1", "skill2"],
-    "meriterande": ["skill1", "skill2"],
-    "språk": ["Python", "SQL"],
-    "verktyg": ["Docker", "AWS"],
+    "krav": ["korta nyckelord för kompetenser, max 3 ord per kompetens"],
+    "meriterande": ["önskvärda kompetenser"],
+    "språk": ["programmeringsspråk/främmande språk"],
+    "verktyg": ["mjukvaror/verktyg/plattformar"],
     "nivå": "Junior/Mid/Senior",
     "arbetstyp": "Remote/Hybrid/Office",
-    "plats": ["Stockholm"],
-    "kvaliteter": ["Ledarskap", "Innovation"],
-    "område": "Chefer/Teknisk/Social"
+    "plats": ["städer"],
+    "kvaliteter": ["personliga egenskaper"],
+    "område": "{område}"
 }}
-Anpassa efter yrkesområde:
-- Chefer: Ledarskap, strategi, ekonomi
-- Teknisk: Programmering, verktyg, system
-- Social: Kommunikation, omvårdnad, service
+Fokusområden:
+- Chefer: Ledarskap, strategi, ekonomi, personalansvar
+- Teknisk: Programmering, verktyg, system, molnplattformar  
+- Social: Kommunikation, omvårdnad, service, regelkunskap
 """
     try:
         response = model.generate_content(prompt)
@@ -120,8 +127,7 @@ Anpassa efter yrkesområde:
     except Exception as e:
         st.error(f"Gemini API fel: {e}")
 
-
-# === VALIDATION OF GEMINI ANSWERS ===
+# === AI RESPONSE VALIDATION ===
 def validate_gemini_response(response_text):
     if not response_text:
         return None        

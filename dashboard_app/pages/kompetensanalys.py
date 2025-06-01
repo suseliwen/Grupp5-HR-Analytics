@@ -14,7 +14,7 @@ if css_file.exists():
 # Occupation mapping for job tables
 OCCUPATION_MAP = {
     'Yrken med social inriktning': 'mart_occupation_social',
-    'Yrken med teknisk inriktning': 'mart_it_jobs', 
+    'Yrken med teknisk inriktning': 'mart_it_jobs',
     'Chefer och verksamhetsledare': 'mart_leadership_jobs'
 }
 OCCUPATION_OPTIONS = ['Alla'] + list(OCCUPATION_MAP.keys())
@@ -24,14 +24,14 @@ OCCUPATION_OPTIONS = ['Alla'] + list(OCCUPATION_MAP.keys())
 def load_job_data(occupation_field=None, limit=15):
     try:
         with DataBase_Connection() as conn:
-            if occupation_field == 'Alla' or occupation_field is None:                
+            if occupation_field == 'Alla' or occupation_field is None:
                 tables = list(OCCUPATION_MAP.values())
                 union_queries = [f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL" for table in tables]
                 query = f"({' UNION ALL '.join(union_queries)}) ORDER BY job_id DESC LIMIT {limit}"
             else:
                 table = OCCUPATION_MAP.get(occupation_field, 'mart_occupation_social')
                 query = f"SELECT job_id, headline, description, employer_name, occupation_field, occupation FROM mart.{table} WHERE description IS NOT NULL LIMIT {limit}"
-            
+                
             return conn.execute(query).fetchdf()
     except Exception as e:
         st.error(f"Database error: {e}")
@@ -40,7 +40,7 @@ def load_job_data(occupation_field=None, limit=15):
 # === AI ANALYSIS FUNCTIONS ===
 def analyze_jobs(job_df, max_jobs=5):
     results = []
-    
+
     with st.status(f"Analyserar {max_jobs} jobb...", expanded=True) as status:
         for i, (_, row) in enumerate(job_df.head(max_jobs).iterrows()):
             if i > 0:
@@ -51,46 +51,46 @@ def analyze_jobs(job_df, max_jobs=5):
             
             job_text = f"Titel: {row['headline']}\nFöretag: {row['employer_name']}\nOmråde: {row['occupation_field']}\nBeskrivning: {row['description'][:800]}..."
             
-            ai_result = analyze_job_with_gemini(job_text)
+            ai_result = analyze_job_with_gemini(job_text, row.get('occupation_field'))
             if ai_result and (parsed := validate_gemini_response(ai_result)):
                 results.append({**row.to_dict(), **parsed})
             else:
                 st.warning(f"Misslyckades med att analysera: {row['headline'][:30]}...")
-        
+                
         status.update(label=f"✅ Klart! Analyserade {len(results)}/{max_jobs} jobb", state="complete")    
     return results
 
 # === METRICS AND KPI FUNCTIONS ===
 def create_metrics(results):
     col1, col2, col3 = st.columns(3)
-    
+
     all_skills = [skill for r in results for skill in (r.get('krav', []) + r.get('meriterande', []))]
     most_common_skill = Counter(all_skills).most_common(1)[0][0] if all_skills else "Ingen data"
-    
+
     total_requirements = len(all_skills)
     avg_requirements = round(total_requirements / len(results), 1) if results else 0
-    
+
     metrics = [
         ("Analyserade jobb", len(results)),
         ("Mest efterfrågad kompetens", most_common_skill),
-        ("Krav per jobb (snitt)", f"{avg_requirements} st") 
-    ]    
+        ("Krav per jobb (snitt)", f"{avg_requirements} st")
+    ]
     for col, (label, value) in zip([col1, col2, col3], metrics):
         col.metric(label, value)
-
+        
 # === VISUALIZATION FUNCTIONS ===
 def create_skills_chart(results):
     all_skills = [skill for r in results for skill in (r.get('krav', []) + r.get('meriterande', []))]
-    
+
     if not all_skills:
         st.info("Ingen kompetensdata att visa")
         return
-    
+
     skills_count = Counter(all_skills).most_common(15)
-    
+
     skills = [skill for skill, _ in skills_count]
     counts = [count for _, count in skills_count]
-    
+
     fig = px.bar(
         x=counts,
         y=skills,
@@ -105,20 +105,20 @@ def create_skills_chart(results):
 
 # === CONTENT GENERATION FUNCTIONS ===
 def create_linkedin_content(results):
-    
+
     all_skills = [skill for r in results for skill in (r.get('krav', []) + r.get('meriterande', []))]
-    
+
     if len(all_skills) < 3:
         return
-    
+
     skill_count = Counter(all_skills).most_common(3)
     hashtags = []
     for skill, count in skill_count:
         clean_hashtag = skill.replace(" ", "").replace("-", "").replace("å", "a").replace("ä", "a").replace("ö", "o")
         hashtags.append(f"#{clean_hashtag}")
-    
+
     hashtags.extend(["#Rekrytering", "#Jobbsökning", "#HR"])
-    
+
     linkedin_post = f"""Hetaste egenskaperna på arbetsmarknaden:
 
 1️⃣ {skill_count[0][0]} ({skill_count[0][1]} jobb)
@@ -131,7 +131,7 @@ Kopiera texten nedan och publicera på LinkedIn!
     st.subheader("LinkedIn marknadsföringsinnehåll")
     st.code(linkedin_post, language="markdown")
 
-
+# === VISUALIZATION FUNCTIONS ===
 def create_visualizations(results):
     if not results:
         st.warning("Ingen data att visa")
@@ -174,7 +174,7 @@ def create_results_table(results):
         "text/csv", 
         use_container_width=True
     )
-    
+
 # === MAIN APPLICATION FUNCTION ===
 def main():
     st.title("AI Kompetensanalys")
@@ -218,7 +218,7 @@ def main():
         if results:
             st.session_state['results'] = results
             st.success(f"Analyserade {len(results)} jobb framgångsrikt!")
-            st.balloons() # Celebration effect
+            st.balloons()
         else:
             st.error("❌ Analysen misslyckades") 
 
