@@ -51,7 +51,7 @@ def analyze_jobs(job_df, max_jobs=5):
             
             job_text = f"Titel: {row['headline']}\nFöretag: {row['employer_name']}\nOmråde: {row['occupation_field']}\nBeskrivning: {row['description'][:800]}..."
             
-            ai_result = analyze_job_with_gemini(job_text)
+            ai_result = analyze_job_with_gemini(job_text, row.get('occupation_field'))
             if ai_result and (parsed := validate_gemini_response(ai_result)):
                 results.append({**row.to_dict(), **parsed})
             else:

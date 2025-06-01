@@ -73,7 +73,7 @@ def setup_gemini():
         api_key = st.sidebar.text_input("Gemini API Key:", type="password")    
     if not api_key:
         st.sidebar.error("API key required")
-        return None   
+        return None
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
@@ -87,32 +87,42 @@ def setup_gemini():
  
 # === PROCESSING JOB TEXT WITH GEMINI ===
 @st.cache_data
-def analyze_job_with_gemini(job_text):
-
+def analyze_job_with_gemini(job_text, occupation_field=None):
     model = setup_gemini()
     if not model:
-        return None    
-    prompt = f"""
-Du är en HR Analytics-specialist som arbetar för en rekryteringsbyrå. Analysera denna jobbannons från Arbetsförmedlingen:
+        return None
+    
+    # Map occupation field to area
+    area_mapping = {
+        'Yrken med social inriktning': 'Social',
+        'Yrken med teknisk inriktning': 'Teknisk', 
+        'Chefer och verksamhetsledare': 'Chefer'
+    }
+    
+    område = area_mapping.get(occupation_field, 'Okänt')
+    # Avoid exceeding token limits
+    short_job_text = job_text[:500] if len(job_text) > 500 else job_text
+    
+    prompt = f"""HR Analytics-specialist: Analysera jobbannons från Arbetsförmedlingen.
 
-{job_text}
+{short_job_text}
 
 Returnera ENDAST giltigt JSON:
 {{
-    "krav": ["skill1", "skill2"],
-    "meriterande": ["skill1", "skill2"],
-    "språk": ["Python", "SQL"],
-    "verktyg": ["Docker", "AWS"],
+    "krav": ["obligatoriska kompetenser"],
+    "meriterande": ["önskvärda kompetenser"],
+    "språk": ["programmeringsspråk/främmande språk"],
+    "verktyg": ["mjukvaror/verktyg/plattformar"],
     "nivå": "Junior/Mid/Senior",
     "arbetstyp": "Remote/Hybrid/Office",
-    "plats": ["Stockholm"],
-    "kvaliteter": ["Ledarskap", "Innovation"],
-    "område": "Chefer/Teknisk/Social"
+    "plats": ["städer"],
+    "kvaliteter": ["personliga egenskaper"],
+    "område": "{område}"
 }}
-Anpassa efter yrkesområde:
-- Chefer: Ledarskap, strategi, ekonomi
-- Teknisk: Programmering, verktyg, system
-- Social: Kommunikation, omvårdnad, service
+Fokusområden:
+- Chefer: Ledarskap, strategi, ekonomi, personalansvar
+- Teknisk: Programmering, verktyg, system, molnplattformar  
+- Social: Kommunikation, omvårdnad, service, regelkunskap
 """
     try:
         response = model.generate_content(prompt)
