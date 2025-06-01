@@ -3,7 +3,6 @@ from utils import DataBase_Connection
 import pandas as pd
 import plotly.express as px
 
-
 # === PAGE CONFIGURATION ===
 st.set_page_config(page_title="Chefer och verksamhetsledare", layout="wide")
 
@@ -15,11 +14,10 @@ try:
 except Exception as e:
     print(f"Kunde inte ladda in style.css: {e}")
 
-
 # === DATA LOADING FUNCTIONS ===
-@st.cache_data(ttl=3600) # 1 hour cache
+@st.cache_data(ttl=3600)
 def load_leadership_data():
-    """Loads data for managers and business leaders from the database"""
+
     try:
         with DataBase_Connection() as conn:
             df = conn.execute("SELECT * FROM mart.mart_leadership_jobs").fetchdf()                    
@@ -35,8 +33,7 @@ def load_leadership_data():
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
-
-# === METRICS VISUALIZATION FUNCTIONS ===
+# === METRICS AND KPI FUNCTIONS ===
 def show_leadership_metrics(df, filtered_df=None):
     """Displays key metrics for leadership roles"""
     if filtered_df is None:
@@ -73,8 +70,7 @@ def show_leadership_metrics(df, filtered_df=None):
     if filtered_jobs < total_jobs:
         st.info(f"**Filtrerad vy:** Visar {filtered_jobs} av totalt {total_jobs} annonser baserat på valda filter.")
 
-
-# === CHART VISUALIZATION FUNCTIONS ===
+# === ROLE CHARTS ===
 def show_role_chart(df):
     """Displays chart for the most common leadership roles"""
     if 'occupation' not in df.columns or df.empty:
@@ -110,7 +106,7 @@ def show_role_chart(df):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
+# === REGION CHARTS ===
 def show_region_chart(df):
     """Displays chart for counties with the most leadership job listings"""
     if 'workplace_region' not in df.columns or df.empty:
@@ -143,10 +139,9 @@ def show_region_chart(df):
     fig.update_traces(textposition='outside', texttemplate='%{y}')
     st.plotly_chart(fig, use_container_width=True)
 
-
-# === CHART VISUALIZATION FUNCTIONS ===
+# === GEOGRAPHIC VISUALIZATION ===
 def show_municipality_chart(df):
-    """Displays chart for municipalities with the most leadership job listings"""
+    
     st.subheader("Topp 10 kommuner")
 
     st.markdown('<div class="municipality-chart-container">', unsafe_allow_html=True)
@@ -192,7 +187,7 @@ def show_municipality_chart(df):
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# === CHART VISUALIZATION FUNCTIONS ===
+# === TREND ANALYSIS CHARTS ===
 def show_trend_chart(df):
     """Displays trend chart for leadership recruitment over time."""
     if 'publication_date' not in df.columns or df.empty:
@@ -294,7 +289,7 @@ def show_trend_chart(df):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
+ # === SECTOR DISTRIBUTION CHARTS ===
 def show_sector_distribution(df):
     """Shows distribution between public and private sector"""    
     st.subheader("Sektorsfördelning")

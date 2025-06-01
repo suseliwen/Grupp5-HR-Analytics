@@ -31,8 +31,10 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 
 ### Dashboard Features
 
-- Interactive KPI metrics and geographic analysis
-- Trend analysis with filtering by location, employer, and job type
+KPI Metrics Dashboard - Real-time job market statistics
+Geographic Analysis - Job distribution across Swedish counties
+Trend Analysis - Historical recruitment patterns
+AI Competency Analysis - Google Gemini extracts skills, requirements, and qualifications from job descriptions, visualizing top competencies and generating LinkedIn marketing content
 
 ### Collaboration Guidelines
 
@@ -52,6 +54,7 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 - [Jobtech API](https://jobsearch.api.jobtechdev.se/) - Swedish Public Employment Service API
 - [Geographic Data](https://github.com/okfse/sweden-geojson) - Municipality and region mappings
 - [Streamlit Documentation](https://docs.streamlit.io/) - Dashboard framework
+- [Google Gemini API](https://ai.google.dev/gemini-api/docs) - AI language model
 
 ### Development Tools
 
