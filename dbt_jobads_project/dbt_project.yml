@@ -1,11 +1,10 @@
-
 # Name your project! Project names should contain only lowercase characters
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
-name: 'dbt_jobads_project'
-version: '1.0.0'
+name: "dbt_jobads_project"
+version: "1.0.0"
 
-profile: 'dbt_jobads_project'
+profile: "dbt_jobads_project"
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -23,6 +22,7 @@ models:
     +materialized: view
 
     src:
+      +materialized: ephemeral
       +schema: staging
 
     dim:
