@@ -22,6 +22,9 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 - Clone the repository from Github and add team members
 - Install dependencies
 - Configure dlt and dbt
+- **Configure DLT Strategy**: In `load_job_ads.py`, choose your data loading approach:
+  ```python
+  @dlt.resource(write_disposition="merge")  # Change as needed
 
 ### Run the Pipeline
 
@@ -31,10 +34,18 @@ This project creates a data pipeline for an HR agency to automate the analysis o
 
 ### Dashboard Features
 
-KPI Metrics Dashboard - Real-time job market statistics
-Geographic Analysis - Job distribution across Swedish counties
-Trend Analysis - Historical recruitment patterns
-AI Competency Analysis - Google Gemini extracts skills, requirements, and qualifications from job descriptions, visualizing top competencies and generating LinkedIn marketing content
+- KPI Metrics Dashboard - Real-time job market statistics
+- Geographic Analysis - Job distribution across Swedish counties
+- Trend Analysis - Historical recruitment patterns
+- AI Competency Analysis - Google Gemini extracts skills, requirements, and qualifications from job descriptions, visualizing top competencies and generating LinkedIn marketing content
+
+### DBT Data Quality Tests
+**Test 1 (`assert_key_generation.sql`):**
+* Validates that surrogate keys are **generated identically** in both tables
+
+**Test 2 (`test_surrogate_key.sql`):**
+* Validates that **all keys from fact exist in dimension tables**
+* Detects **referential integrity violations**
 
 ### Collaboration Guidelines
 
