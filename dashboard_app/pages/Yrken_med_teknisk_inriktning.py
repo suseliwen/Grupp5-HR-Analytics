@@ -22,6 +22,7 @@ def show_it_metrics(df):
     num_employers = df['employer_name'].nunique() if 'employer_name' in df.columns else 0
     #counts the amount of ads in database
     total_jobs = len(df)
+    #puts all job ads with highest amount of ads per occupation in df_most_wanted dataframe
     df_most_wanted = df[df['occupation'].isin([df['occupation'].value_counts().idxmax()])]
     #adds column with four value (eight if you count description string)
     col1, col2, col3, col4 = st.columns(4)
