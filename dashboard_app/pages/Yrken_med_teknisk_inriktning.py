@@ -14,7 +14,7 @@ def load_data(mart_table):
         st.error(f"Fel vid inläsning av data från {mart_table}: {e}")
         return pd.DataFrame()
 def show_it_metrics(df):
-    #counts the amount of coulumns with "is_open"
+    #counts the amount of columns with "is_open"
     active_jobs = df['is_open'].sum() # if 'is_open' in df.columns else "Okänt"
     #counts the amount of unique strings in the occupation column
     occupation_areas = df['occupation'].nunique() if 'occupation' in df.columns else 0
@@ -22,12 +22,17 @@ def show_it_metrics(df):
     num_employers = df['employer_name'].nunique() if 'employer_name' in df.columns else 0
     #counts the amount of ads in database
     total_jobs = len(df)
+    #puts all job ads with highest amount of ads per occupation in df_most_wanted dataframe
+    df_most_wanted = df[df['occupation'].isin([df['occupation'].value_counts().idxmax()])]
     #adds column with four value (eight if you count description string)
     col1, col2, col3, col4 = st.columns(4)
+    col5, col6 = st.columns(2)
     col1.metric("Totala IT annonser", total_jobs)
     col2.metric("Aktiva IT annonser", active_jobs)
     col3.metric("Ockupationsområden", occupation_areas)
     col4.metric("Arbetsgivare", num_employers)
+    col5.metric("Mest eftertracktade IT område", df['occupation'].value_counts().idxmax())
+    col6.metric(f"Annonser för {df['occupation'].value_counts().idxmax()}", len(df_most_wanted.index))
 
 def main():
     st.title("Yrken med teknisk inriktning")
